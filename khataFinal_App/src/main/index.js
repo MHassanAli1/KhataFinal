@@ -1,7 +1,16 @@
 import { app, shell, BrowserWindow, ipcMain } from 'electron'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
-import icon from '../../resources/icon.jpg?asset'
+import { resolve } from 'path'
+
+// Use the book icon from resources directory
+const getIconPath = () => {
+  const iconPath = join(process.cwd(), 'resources', 'notebook_address_book_book_icon_188753.ico')
+  console.log('Using book icon path:', iconPath)
+  return iconPath
+}
+
+const iconPath = getIconPath()
 import { registerAuthHandlers } from './ipc/auth.js'
 import transactionHandlers from './ipc/transaction.js'
 import akhrajatHandlers from './ipc/akhrajat.js'
@@ -14,12 +23,13 @@ const prisma = new PrismaClient()
 
 function createWindow() {
   // Create the browser window.
+  console.log('Creating window with icon:', iconPath)
   const mainWindow = new BrowserWindow({
     width: 900,
     height: 670,
     show: false,
     autoHideMenuBar: true,
-    ...(process.platform === 'linux' ? { icon } : {}),
+    icon: iconPath,
     webPreferences: {
       preload: join(__dirname, '../preload/index.mjs'),
       sandbox: false,

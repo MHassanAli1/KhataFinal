@@ -10,11 +10,17 @@
   background: #ef4444;
   color: white;
   border: none;
-  border-radius: 50%;
+  border-radius: 50% !important; /* Enforce perfect circle */
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
   cursor: pointer;
   z-index: 999;
   transition: transform 0.2s, box-shadow 0.2s;
+  min-width: 50px; /* Ensure minimum width */
+  min-height: 50px; /* Ensure minimum height */
+  max-width: 50px; /* Ensure maximum width */
+  max-height: 50px; /* Ensure maximum height */
+  padding: 0; /* Remove any padding that might affect shape */
+  overflow: hidden; /* Ensure content doesn't affect shape */
 }
 
 .logout-button:hover {
@@ -31,5 +37,9 @@
   .logout-button {
     width: 45px;
     height: 45px;
+    min-width: 45px;
+    min-height: 45px;
+    max-width: 45px;
+    max-height: 45px;
   }
 }

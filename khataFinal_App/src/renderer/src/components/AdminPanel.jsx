@@ -3,10 +3,14 @@
 import React, { useEffect, useState } from 'react'
 import './AdminPanel.css'
 import { useNavigate } from 'react-router-dom'
+import { LogoutButton } from './logout'
+import UrduKeyboard from './UrduKeyboard'
 
 export default function AdminPanel() {
   const [zones, setZones] = useState([])
   const [titles, setTitles] = useState([])
+  const [showKeyboard, setShowKeyboard] = useState(false)
+  const [activeInput, setActiveInput] = useState(null)
 
   const [newZone, setNewZone] = useState('')
   const [newKhda, setNewKhda] = useState('')
@@ -24,6 +28,34 @@ export default function AdminPanel() {
   const [editingTitleName, setEditingTitleName] = useState('')
 
   const navigate = useNavigate()
+
+  // Handle keyboard functionality
+  const handleKeyPress = (char) => {
+    if (!activeInput) return
+
+    const element = document.getElementById(activeInput)
+    if (!element) return
+
+    if (char === 'backspace') {
+      element.value = element.value.slice(0, -1)
+    } else {
+      element.value += char
+    }
+
+    // Trigger change event to update state
+    const event = new Event('input', { bubbles: true })
+    element.dispatchEvent(event)
+  }
+
+  const closeKeyboard = () => {
+    setShowKeyboard(false)
+    setActiveInput(null)
+  }
+
+  const handleFocus = (e) => {
+    setActiveInput(e.target.id)
+    setShowKeyboard(true) // Automatically show keyboard when input is focused
+  }
 
   const loadData = async () => {
     const z = await window.api.admin.zones.getAll()
@@ -127,6 +159,8 @@ export default function AdminPanel() {
       </button>
 
       {/* Zones with khdas */}
+
+      {/* Zones with khdas */}
       <div className="section">
         <h2 className="section-title">زون اور کھدے</h2>
         {zones.map((zone) => (
@@ -137,6 +171,8 @@ export default function AdminPanel() {
                   type="text"
                   value={editingZoneName}
                   onChange={(e) => setEditingZoneName(e.target.value)}
+                  onFocus={handleFocus}
+                  id={`editZone-${zone.id}`}
                   className="input-text"
                 />
                 <button onClick={updateZone} className="button-save">
@@ -173,6 +209,8 @@ export default function AdminPanel() {
                       type="text"
                       value={editingKhdaName}
                       onChange={(e) => setEditingKhdaName(e.target.value)}
+                      onFocus={handleFocus}
+                      id={`editKhda-${khda.id}`}
                       className="input-text"
                     />
                     <select
@@ -231,10 +269,12 @@ export default function AdminPanel() {
         >
           <input
             type="text"
-            placeholder="زون کا نام"
             value={newZone}
             onChange={(e) => setNewZone(e.target.value)}
+            onFocus={handleFocus}
+            id="newZone"
             className="input-text"
+            placeholder="زون کا نام"
           />
           <button className="button-submit">شامل کریں</button>
         </form>
@@ -267,6 +307,8 @@ export default function AdminPanel() {
             placeholder="کھدہ کا نام"
             value={newKhda}
             onChange={(e) => setNewKhda(e.target.value)}
+            onFocus={handleFocus}
+            id="newKhda"
             className="input-text"
           />
           <button className="button-submit">شامل کریں</button>
@@ -284,6 +326,8 @@ export default function AdminPanel() {
                   type="text"
                   value={editingTitleName}
                   onChange={(e) => setEditingTitleName(e.target.value)}
+                  onFocus={handleFocus}
+                  id={`editTitle-${title.id}`}
                   className="input-text"
                 />
                 <button onClick={updateTitle} className="button-save">
@@ -331,11 +375,31 @@ export default function AdminPanel() {
             placeholder="عنوان"
             value={newTitle}
             onChange={(e) => setNewTitle(e.target.value)}
+            onFocus={handleFocus}
+            id="newTitle"
             className="input-text"
           />
           <button className="button-submit">شامل کریں</button>
         </form>
       </div>
+
+      {/* Keyboard toggle button */}
+      <button
+        type="button"
+        className="keyboard-button"
+        onClick={() => setShowKeyboard(!showKeyboard)}
+        aria-label="Toggle Urdu Keyboard"
+      >
+        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="white">
+          <path d="M20,5H4C2.9,5 2,5.9 2,7V17C2,18.1 2.9,19 4,19H20C21.1,19 22,18.1 22,17V7C22,5.9 21.1,5 20,5M5,8H7V10H5V8M5,11H7V13H5V11M8,8H10V10H8V8M8,11H10V13H8V11M11,8H13V10H11V8M11,11H13V13H11V11M14,8H16V10H14V8M14,11H16V13H14V11M17,8H19V10H17V8M17,11H19V13H17V11M12,14H19V16H12V14M5,14H10V16H5V14Z" />
+        </svg>
+      </button>
+
+      {/* Add logout button */}
+      <LogoutButton />
+
+      {/* Urdu Keyboard */}
+      {showKeyboard && <UrduKeyboard onKeyPress={handleKeyPress} onClose={closeKeyboard} />}
     </div>
   )
 }
