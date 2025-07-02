@@ -1,16 +1,39 @@
 import { app, shell, BrowserWindow, ipcMain } from 'electron'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
-import { resolve } from 'path'
 
 // Use the book icon from resources directory
 const getIconPath = () => {
-  const iconPath = join(process.cwd(), 'resources', 'notebook_address_book_book_icon_188753.ico')
+  let iconPath;
+  if (is.dev) {
+    // In development
+    iconPath = join(process.cwd(), 'resources', 'notebook_address_book_book_icon_188753.ico')
+  } else {
+    // In production
+    iconPath = join(process.resourcesPath, 'notebook_address_book_book_icon_188753.ico')
+  }
   console.log('Using book icon path:', iconPath)
   return iconPath
 }
 
+// Set database path
+const getDatabasePath = () => {
+  let dbPath;
+  if (is.dev) {
+    dbPath = join(process.cwd(), 'prisma', 'data', 'finance.db')
+  } else {
+    dbPath = join(process.resourcesPath, 'prisma', 'data', 'finance.db')
+  }
+  console.log('Database path:', dbPath)
+  return dbPath
+}
+
 const iconPath = getIconPath()
+const dbPath = getDatabasePath()
+
+// Set DATABASE_URL for Prisma
+process.env.DATABASE_URL = `file:${dbPath}`
+
 import { registerAuthHandlers } from './ipc/auth.js'
 import transactionHandlers from './ipc/transaction.js'
 import akhrajatHandlers from './ipc/akhrajat.js'
@@ -19,6 +42,8 @@ import registerTestHandlers from './ipc/test.js'
 import { registerAdminHandlers } from './ipc/admin.js'
 import syncHandlers from './ipc/sync.js'
 import { PrismaClient } from '@prisma/client'
+
+// Initialize Prisma with the correct database URL
 const prisma = new PrismaClient()
 
 function createWindow() {

@@ -1,22 +1,36 @@
 appId: com.electron.app
 productName: khata
 directories:
+  app: out
+  output: dist
   buildResources: build
-files:
-  - '!**/.vscode/*'
-  - '!src/*'
-  - '!electron.vite.config.{js,ts,mjs,cjs}'
-  - '!{.eslintcache,eslint.config.mjs,.prettierignore,.prettierrc.yaml,dev-app-update.yml,CHANGELOG.md,README.md}'
-  - '!{.env,.env.*,.npmrc,pnpm-lock.yaml}'
-asarUnpack:
-  - resources/**
+asar: false
+afterPack: scripts/after-pack.js
+extraResources:
+  - from: prisma
+    to: prisma
+  - from: resources
+    to: resources
+  - from: node_modules/@prisma/client
+    to: node_modules/@prisma/client
+  - from: node_modules/.prisma
+    to: node_modules/.prisma
+  - from: node_modules/node-fetch
+    to: node_modules/node-fetch
+  - from: node_modules/@electron-toolkit
+    to: node_modules/@electron-toolkit
 win:
   executableName: khata
+  icon: build/book-icon.png
+  target: nsis
 nsis:
   artifactName: ${name}-${version}-setup.${ext}
   shortcutName: ${productName}
   uninstallDisplayName: ${productName}
   createDesktopShortcut: always
+publish:
+  provider: generic
+  url: https://example.com/auto-updates
 mac:
   entitlementsInherit: build/entitlements.mac.plist
   icon: build/book-icon.icns
@@ -39,6 +53,3 @@ linux:
 appImage:
   artifactName: ${name}-${version}.${ext}
 npmRebuild: false
-publish:
-  provider: generic
-  url: https://example.com/auto-updates
