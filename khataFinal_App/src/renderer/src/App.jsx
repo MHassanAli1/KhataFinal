@@ -6,7 +6,6 @@ import AdminPanel from './components/AdminPanel.jsx'
 import AkhrajatSummary from './components/AkhrajatSummary.jsx'
 import TrollySummary from './components/TrollySummary.jsx'
 import TransactionSummary from './components/TransactionSummary.jsx'
-import SyncToCloudButton from './components/SyncToCloudButton.jsx'
 
 function App() {
   return (
@@ -19,7 +18,6 @@ function App() {
         <Route path="/AkhrajatSummary" element={<AkhrajatSummary />} />
         <Route path="/TrollySummary" element={<TrollySummary />} />
         <Route path="/TransactionSummary" element={<TransactionSummary />} />
-        <Route path="/SyncToCloudButton" element={<SyncToCloudButton />} />
       </Routes>
     </Router>
   )

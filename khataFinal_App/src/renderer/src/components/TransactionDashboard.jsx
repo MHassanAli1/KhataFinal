@@ -4,6 +4,7 @@ import './TransactionDashboard.css'
 import TransactionDetails from './TransactionDetails'
 import UrduKeyboard from './UrduKeyboard' // Import UrduKeyboard component
 import { LogoutButton } from './logout'
+import SyncToCloudButton from './SyncToCloudButton'
 
 function TransactionDashboard() {
   const [transactions, setTransactions] = useState([])
@@ -710,13 +711,7 @@ function TransactionDashboard() {
       >
         goto Transaction Summary
       </button>
-      <button
-        onClick={() => {
-          handleNavigation('.SyncToCloudButton')
-        }}
-      >
-        Sync to Cloud
-      </button>
+      <SyncToCloudButton />
     </div>
   )
 }
