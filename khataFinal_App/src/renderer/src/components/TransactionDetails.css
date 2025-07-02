@@ -1,0 +1,870 @@
+/* TransactionDetails.css - Enhanced Version */
+
+.form-error-toast {
+  background-color: #e53935; /* vivid red */
+  color: #fff;
+  padding: 10px 20px;
+  margin: 10px 0;
+  border-radius: 4px;
+  font-weight: bold;
+  text-align: center;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  animation: fadeIn 0.4s ease;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(-10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+
+.transaction-details {
+  background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
+  border-radius: 20px;
+  box-shadow: 0 25px 70px rgba(0, 0, 0, 0.15);
+  padding: 32px;
+  max-width: 900px;
+  width: 95%;
+  max-height: 90vh;
+  overflow-y: auto;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  direction: rtl;
+  text-align: right;
+  position: relative;
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+/* Navigation Buttons */
+.nav-buttons {
+  display: flex;
+  gap: 16px;
+  margin-bottom: 28px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.nav-button {
+  padding: 14px 36px;
+  border: none;
+  border-radius: 12px;
+  cursor: pointer;
+  font-size: 16px;
+  font-weight: 700;
+  transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
+  min-width: 130px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  position: relative;
+  overflow: hidden;
+}
+
+.nav-button::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
+  transition: left 0.6s;
+}
+
+.nav-button:hover::before {
+  left: 100%;
+}
+
+.form-button {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  box-shadow: 0 8px 25px rgba(102, 126, 234, 0.4);
+}
+
+.form-button:hover {
+  background: linear-gradient(135deg, #5a67d8 0%, #6b46c1 100%);
+  transform: translateY(-3px) scale(1.02);
+  box-shadow: 0 15px 35px rgba(102, 126, 234, 0.5);
+}
+
+.report-button {
+  background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+  color: white;
+  box-shadow: 0 8px 25px rgba(240, 147, 251, 0.4);
+}
+
+.report-button:hover {
+  background: linear-gradient(135deg, #ec4899 0%, #ef4444 100%);
+  transform: translateY(-3px) scale(1.02);
+  box-shadow: 0 15px 35px rgba(240, 147, 251, 0.5);
+}
+
+.transaction-details h4 {
+  color: #1a202c;
+  font-size: 24px;
+  font-weight: 800;
+  margin-bottom: 24px;
+  border-bottom: 4px solid transparent;
+  border-image: linear-gradient(90deg, #3498db, #2980b9) 1;
+  padding-bottom: 12px;
+  text-align: center;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  position: relative;
+}
+
+.transaction-details h4::after {
+  content: '';
+  position: absolute;
+  bottom: -4px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 60px;
+  height: 4px;
+  background: linear-gradient(90deg, #3498db, #2980b9);
+  border-radius: 2px;
+}
+
+/* Akhrajat Section */
+.akhrajat-section {
+  margin-bottom: 36px;
+  padding: 28px;
+  background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+  border-radius: 16px;
+  border: 1px solid #dee2e6;
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.08);
+  position: relative;
+  overflow: hidden;
+}
+
+.akhrajat-section::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background: linear-gradient(90deg, #3498db, #2980b9, #3498db);
+  background-size: 200% 100%;
+  animation: shimmer 3s linear infinite;
+}
+
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+.akhrajat-item {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 18px;
+  padding: 18px;
+  background: #ffffff;
+  border-radius: 12px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.08);
+  border: 1px solid #e3e6ea;
+  transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  position: relative;
+  overflow: hidden;
+}
+
+.akhrajat-item::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(52, 152, 219, 0.1), transparent);
+  transition: left 0.6s;
+}
+
+.akhrajat-item:hover::before {
+  left: 100%;
+}
+
+.akhrajat-item:hover {
+  transform: translateY(-4px) scale(1.02);
+  box-shadow: 0 15px 35px rgba(0, 0, 0, 0.15);
+  border-color: #3498db;
+}
+
+.akhrajat-item input[type="text"] {
+  flex: 2;
+  padding: 14px 18px;
+  border: 2px solid #e1e5e9;
+  border-radius: 10px;
+  font-size: 15px;
+  transition: all 0.3s ease;
+  direction: rtl;
+  text-align: right;
+  background: #ffffff;
+  color: #2c3e50 !important;
+  font-weight: 500;
+}
+
+.akhrajat-item input[type="number"] {
+  flex: 1;
+  padding: 14px 18px;
+  border: 2px solid #e1e5e9;
+  border-radius: 10px;
+  font-size: 15px;
+  transition: all 0.3s ease;
+  text-align: center;
+  background: #ffffff;
+  color: #2c3e50 !important;
+  font-weight: 500;
+}
+
+.akhrajat-item input:focus {
+  outline: none;
+  border-color: #3498db;
+  box-shadow: 0 0 0 4px rgba(52, 152, 219, 0.15);
+  background: #ffffff;
+  color: #2c3e50 !important;
+  transform: scale(1.02);
+}
+
+.akhrajat-item input::placeholder {
+  color: #7c8ba1;
+  font-weight: 400;
+}
+
+.akhrajat-item button {
+  padding: 12px 14px;
+  background: linear-gradient(135deg, #e74c3c, #c0392b);
+  color: white;
+  border: none;
+  border-radius: 10px;
+  cursor: pointer;
+  font-size: 16px;
+  transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  min-width: 50px;
+  height: 50px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 6px 20px rgba(231, 76, 60, 0.3);
+  position: relative;
+  overflow: hidden;
+}
+
+.akhrajat-item button::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 0;
+  height: 0;
+  background: rgba(255, 255, 255, 0.3);
+  transition: all 0.3s ease;
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+}
+
+.akhrajat-item button:hover::before {
+  width: 100px;
+  height: 100px;
+}
+
+.akhrajat-item button:hover {
+  background: linear-gradient(135deg, #c0392b, #a93226);
+  transform: translateY(-3px) scale(1.1);
+  box-shadow: 0 12px 30px rgba(231, 76, 60, 0.4);
+}
+
+/* New Akhrajat Form */
+.new-akhrajat-form {
+  display: flex;
+  gap: 16px;
+  margin-top: 28px;
+  padding: 24px;
+  background: #ffffff;
+  border-radius: 16px;
+  border: 3px dashed #3498db;
+  box-shadow: 0 8px 25px rgba(52, 152, 219, 0.1);
+  position: relative;
+  overflow: hidden;
+}
+
+.new-akhrajat-form::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(52, 152, 219, 0.05), transparent);
+  transition: left 0.8s;
+}
+
+.new-akhrajat-form:hover::before {
+  left: 100%;
+}
+
+.new-akhrajat-form input {
+  padding: 16px 20px;
+  border: 2px solid #e1e5e9;
+  border-radius: 10px;
+  font-size: 15px;
+  transition: all 0.3s ease;
+  background: #ffffff;
+  color: #2c3e50 !important;
+  font-weight: 500;
+}
+
+.new-akhrajat-form input[type="text"] {
+  flex: 2;
+  direction: rtl;
+  text-align: right;
+}
+
+.new-akhrajat-form input[type="number"] {
+  flex: 1;
+  text-align: center;
+}
+
+.new-akhrajat-form input:focus {
+  outline: none;
+  border-color: #3498db;
+  box-shadow: 0 0 0 4px rgba(52, 152, 219, 0.15);
+  transform: scale(1.02);
+  background: #ffffff;
+  color: #2c3e50 !important;
+}
+
+.new-akhrajat-form input::placeholder {
+  color: #7c8ba1;
+  font-weight: 400;
+}
+
+.new-akhrajat-form button {
+  padding: 16px 28px;
+  background: linear-gradient(135deg, #27ae60, #219a52);
+  color: white;
+  border: none;
+  border-radius: 10px;
+  cursor: pointer;
+  font-size: 15px;
+  font-weight: 700;
+  transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  white-space: nowrap;
+  box-shadow: 0 8px 25px rgba(39, 174, 96, 0.3);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  position: relative;
+  overflow: hidden;
+}
+
+.new-akhrajat-form button::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
+  transition: left 0.6s;
+}
+
+.new-akhrajat-form button:hover::before {
+  left: 100%;
+}
+
+.new-akhrajat-form button:hover {
+  background: linear-gradient(135deg, #219a52, #1e8449);
+  transform: translateY(-3px) scale(1.05);
+  box-shadow: 0 15px 35px rgba(39, 174, 96, 0.4);
+}
+
+/* Trolly Section */
+.trolly-section {
+  margin-bottom: 36px;
+  padding: 28px;
+  background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+  border-radius: 16px;
+  border: 1px solid #dee2e6;
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.08);
+  position: relative;
+  overflow: hidden;
+}
+
+.trolly-section::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background: linear-gradient(90deg, #27ae60, #219a52, #27ae60);
+  background-size: 200% 100%;
+  animation: shimmer 3s linear infinite;
+}
+
+.trolly-form {
+  display: grid;
+  gap: 20px;
+  margin-bottom: 28px;
+}
+
+.trolly-field {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  padding: 20px;
+  background: #ffffff;
+  border-radius: 12px;
+  border: 1px solid #dee2e6;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.06);
+  transition: all 0.3s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.trolly-field::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(39, 174, 96, 0.1), transparent);
+  transition: left 0.6s;
+}
+
+.trolly-field:hover::before {
+  left: 100%;
+}
+
+.trolly-field:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
+  border-color: #27ae60;
+}
+
+.trolly-field label {
+  font-weight: 700;
+  color: #2c3e50;
+  min-width: 150px;
+  font-size: 16px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.trolly-field input {
+  flex: 1;
+  padding: 14px 18px;
+  border: 2px solid #e1e5e9;
+  border-radius: 10px;
+  font-size: 15px;
+  transition: all 0.3s ease;
+  text-align: center;
+  background: #ffffff;
+  color: #2c3e50 !important;
+  font-weight: 600;
+}
+
+.trolly-field input:focus {
+  outline: none;
+  border-color: #27ae60;
+  box-shadow: 0 0 0 4px rgba(39, 174, 96, 0.15);
+  transform: scale(1.02);
+  background: #ffffff;
+  color: #2c3e50 !important;
+}
+
+.save-trolly-btn {
+  width: 100%;
+  padding: 20px 28px;
+  background: linear-gradient(135deg, #3498db, #2980b9);
+  color: white;
+  border: none;
+  border-radius: 16px;
+  cursor: pointer;
+  font-size: 18px;
+  font-weight: 800;
+  transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  box-shadow: 0 10px 30px rgba(52, 152, 219, 0.4);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  position: relative;
+  overflow: hidden;
+}
+
+.save-trolly-btn::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
+  transition: left 0.6s;
+}
+
+.save-trolly-btn:hover::before {
+  left: 100%;
+}
+
+.save-trolly-btn:hover {
+  background: linear-gradient(135deg, #2980b9, #21618c);
+  box-shadow: 0 15px 40px rgba(52, 152, 219, 0.5);
+  transform: translateY(-4px) scale(1.02);
+}
+
+.save-trolly-btn:active {
+  transform: translateY(-2px) scale(0.98);
+  animation: pulse 0.6s;
+}
+
+/* Close Button */
+.close-btn {
+  width: 100%;
+  padding: 16px 28px;
+  background: linear-gradient(135deg, #95a5a6, #7f8c8d);
+  color: white;
+  border: none;
+  border-radius: 16px;
+  cursor: pointer;
+  font-size: 17px;
+  font-weight: 700;
+  transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  margin-top: 24px;
+  box-shadow: 0 8px 25px rgba(149, 165, 166, 0.3);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  position: relative;
+  overflow: hidden;
+}
+
+.close-btn::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
+  transition: left 0.6s;
+}
+
+.close-btn:hover::before {
+  left: 100%;
+}
+
+.close-btn:hover {
+  background: linear-gradient(135deg, #7f8c8d, #6c7b7d);
+  transform: translateY(-3px) scale(1.02);
+  box-shadow: 0 12px 30px rgba(149, 165, 166, 0.4);
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .transaction-details {
+    padding: 20px;
+    margin: 10px;
+    max-height: 95vh;
+    border-radius: 16px;
+  }
+
+  .nav-buttons {
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .nav-button {
+    width: 100%;
+    padding: 16px 20px;
+  }
+
+  .akhrajat-item {
+    flex-direction: column;
+    gap: 12px;
+    padding: 16px;
+  }
+
+  .akhrajat-item input {
+    width: 100%;
+  }
+
+  .new-akhrajat-form {
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .new-akhrajat-form input,
+  .new-akhrajat-form button {
+    width: 100%;
+  }
+
+  .trolly-field {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+
+  .trolly-field label {
+    min-width: auto;
+    margin-bottom: 4px;
+  }
+
+  .trolly-field input {
+    width: 100%;
+  }
+
+  .transaction-details h4 {
+    font-size: 20px;
+  }
+
+  .akhrajat-section,
+  .trolly-section {
+    padding: 16px;
+  }
+}
+
+@media (max-width: 480px) {
+  .transaction-details {
+    padding: 16px;
+    margin: 5px;
+    border-radius: 12px;
+  }
+
+  .transaction-details h4 {
+    font-size: 18px;
+  }
+
+  .akhrajat-section,
+  .trolly-section {
+    padding: 12px;
+  }
+
+  .nav-button {
+    padding: 14px 16px;
+    font-size: 14px;
+  }
+
+  .save-trolly-btn {
+    padding: 16px 20px;
+    font-size: 16px;
+  }
+
+  .close-btn {
+    padding: 14px 20px;
+    font-size: 15px;
+  }
+}
+
+/* Scrollbar Styling */
+.transaction-details::-webkit-scrollbar {
+  width: 8px;
+}
+
+.transaction-details::-webkit-scrollbar-track {
+  background: linear-gradient(135deg, #f1f1f1, #e0e0e0);
+  border-radius: 4px;
+}
+
+.transaction-details::-webkit-scrollbar-thumb {
+  background: linear-gradient(135deg, #3498db, #2980b9);
+  border-radius: 4px;
+  transition: background 0.3s ease;
+}
+
+.transaction-details::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(135deg, #2980b9, #21618c);
+}
+
+/* Animation for form submission */
+@keyframes pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(52, 152, 219, 0.7);
+  }
+  70% {
+    box-shadow: 0 0 0 15px rgba(52, 152, 219, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(52, 152, 219, 0);
+  }
+}
+
+/* Glow effect for focused inputs */
+@keyframes glow {
+  0% {
+    box-shadow: 0 0 5px rgba(52, 152, 219, 0.5);
+  }
+  50% {
+    box-shadow: 0 0 20px rgba(52, 152, 219, 0.8);
+  }
+  100% {
+    box-shadow: 0 0 5px rgba(52, 152, 219, 0.5);
+  }
+}
+
+.transaction-details input:focus {
+  animation: glow 2s infinite;
+}
+
+/* Loading state for buttons */
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.button-loading::after {
+  content: '';
+  width: 16px;
+  height: 16px;
+  margin-left: 8px;
+  border: 2px solid transparent;
+  border-top: 2px solid currentColor;
+  border-radius: 50%;
+  display: inline-block;
+  animation: spin 1s linear infinite;
+}
+
+/* Fade in animation for sections */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.akhrajat-section,
+.trolly-section {
+  animation: fadeInUp 0.6s ease-out;
+}
+
+.akhrajat-section {
+  animation-delay: 0.1s;
+}
+
+.trolly-section {
+  animation-delay: 0.2s;
+}
+
+/* Success state styling */
+.success-state {
+  border: 2px solid #27ae60;
+  background: linear-gradient(135deg, #d5ffd5, #c8f7c8);
+}
+
+.success-state input {
+  border-color: #27ae60;
+  background: rgba(39, 174, 96, 0.05);
+}
+
+/* Error state styling */
+.error-state {
+  border: 2px solid #e74c3c;
+  background: linear-gradient(135deg, #ffd5d5, #f7c8c8);
+}
+
+.error-state input {
+  border-color: #e74c3c;
+  background: rgba(231, 76, 60, 0.05);
+}
+
+/* Enhanced focus states */
+.transaction-details input:focus,
+.transaction-details button:focus {
+  outline: none;
+  position: relative;
+  z-index: 1;
+}
+
+/* Improved button active states */
+.transaction-details button:active {
+  transform: scale(0.95);
+}
+
+/* Custom placeholder styling */
+.transaction-details input::placeholder {
+  color: #95a5a6;
+  font-style: italic;
+  font-weight: 400;
+}
+
+/* Enhanced hover effects for better UX */
+.transaction-details button:not(:disabled):not(.loading):hover {
+  cursor: pointer;
+}
+
+.transaction-details button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none !important;
+}
+/* Keyboard toggle button */
+.circle-btn {
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  color: white;
+  border: none;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+  font-size: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.circle-btn:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.25);
+}
+
+.circle-btn:active {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15);
+}
+
+.circle-btn.primary {
+  background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
+}
+
+.circle-btn.primary:hover {
+  background: linear-gradient(135deg, #2563eb 0%, #1e40af 100%);
+}
+
+.keyboard-toggle {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  z-index: 999;
+}
+
+/* Active input highlighting */
+.active-input {
+  border-color: #3b82f6 !important;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2) !important;
+}
+
+/* Update filter inputs to support Urdu text better */
+.filters input[type="text"] {
+  padding: 12px 16px;
+  border: 2px solid #e5e7eb;
+  border-radius: 10px;
+  font-size: 15px;
+  background: white;
+  color: #374151;
+  transition: all 0.3s ease;
+  min-width: 180px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+  font-family: 'Noto Nastaliq Urdu', 'Jameel Noori Nastaleeq', 'Segoe UI', Arial, sans-serif;
+}
+
+.filters input[type="text"]:focus {
+  outline: none;
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
+}

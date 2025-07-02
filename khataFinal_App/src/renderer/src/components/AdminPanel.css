@@ -1,0 +1,131 @@
+.container {
+  padding: 1rem;
+}
+
+.section {
+  margin-bottom: 2rem;
+}
+
+.section-title {
+  font-size: 1.25rem;
+  font-weight: bold;
+  border-bottom: 1px solid #000;
+  padding-bottom: 0.5rem;
+}
+
+.zone-container {
+  border: 1px solid #000;
+  padding: 0.5rem;
+  border-radius: 0.25rem;
+  background-color: #f8fafc;
+  margin-bottom: 0.5rem;
+}
+
+.zone-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.zone-title {
+  font-weight: 600;
+  text-align: right;
+}
+
+.button-group {
+  display: flex;
+  gap: 0.25rem;
+}
+
+.flex-container {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.input-text {
+  border: 1px solid #000;
+  padding: 0.25rem;
+  flex: 1;
+  text-align: right;
+}
+
+.select-input {
+  border: 1px solid #000;
+  padding: 0.25rem;
+  text-align: right;
+}
+
+.button-save {
+  background-color: #16a34a;
+  color: white;
+  padding: 0.25rem;
+  border-radius: 0.25rem;
+  border: none;
+  cursor: pointer;
+}
+
+.button-cancel {
+  background-color: #9ca3af;
+  color: white;
+  padding: 0.25rem;
+  border-radius: 0.25rem;
+  border: none;
+  cursor: pointer;
+}
+
+.button-edit {
+  background-color: #eab308;
+  color: white;
+  padding: 0.25rem;
+  border-radius: 0.25rem;
+  border: none;
+  cursor: pointer;
+}
+
+.button-delete {
+  background-color: #dc2626;
+  color: white;
+  padding: 0.25rem;
+  border-radius: 0.25rem;
+  border: none;
+  cursor: pointer;
+}
+
+.khda-list {
+  padding-right: 1rem;
+  list-style-type: disc;
+  text-align: right;
+}
+
+.khda-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.title-list {
+  padding-right: 1rem;
+  list-style-type: disc;
+  text-align: right;
+  margin-bottom: 0.25rem;
+}
+
+.title-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.form {
+  margin-bottom: 0.5rem;
+}
+
+.button-submit {
+  background-color: #16a34a;
+  color: white;
+  padding: 0.5rem;
+  border-radius: 0.25rem;
+  border: none;
+  width: 100%;
+  cursor: pointer;
+}
