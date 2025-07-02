@@ -36,6 +36,20 @@ function TransactionDashboard() {
   // References for text input fields
   const inputRefs = useRef({})
 
+  // Add effect to add/remove body class for editing mode
+  useEffect(() => {
+    if (Object.keys(editRows).length > 0) {
+      document.body.classList.add('editing-active-body');
+    } else {
+      document.body.classList.remove('editing-active-body');
+    }
+    
+    // Clean up on unmount
+    return () => {
+      document.body.classList.remove('editing-active-body');
+    };
+  }, [editRows]);
+
   useEffect(() => {
     window.api.transactions.getAll().then(setTransactions)
   }, [])
@@ -270,7 +284,7 @@ function TransactionDashboard() {
         </label>
       </div>
 
-      <div className="table-container">
+      <div className={`table-container ${Object.keys(editRows).length > 0 ? 'editing-active' : ''}`}>
         <table>
           <thead>
             <tr>
@@ -682,36 +696,54 @@ function TransactionDashboard() {
 
       {/* Urdu Keyboard */}
       {showKeyboard && <UrduKeyboard onKeyPress={handleKeyPress} onClose={closeKeyboard} />}
+      
+      {/* Bottom Navigation Menu */}
+      <div className="bottom-navigation">
+        <div className="bottom-nav-section">
+          <h4 className="section-title">📊 رپورٹس اور خلاصہ</h4>
+          <div className="bottom-nav-buttons">
+            <button
+              className="bottom-nav-btn primary"
+              onClick={() => handleNavigation('./AkhrajatSummary')}
+            >
+              <span className="btn-icon">💰</span>
+              <span className="btn-text">اخراجات کا خلاصہ</span>
+            </button>
+            <button
+              className="bottom-nav-btn primary"
+              onClick={() => handleNavigation('./TrollySummary')}
+            >
+              <span className="btn-icon">🚛</span>
+              <span className="btn-text">ٹرالی کا خلاصہ</span>
+            </button>
+            <button
+              className="bottom-nav-btn primary"
+              onClick={() => handleNavigation('./TransactionSummary')}
+            >
+              <span className="btn-icon">📈</span>
+              <span className="btn-text">ٹرانزیکشن کا خلاصہ</span>
+            </button>
+          </div>
+        </div>
+
+        <div className="bottom-nav-section">
+          <h4 className="section-title">⚙️ منیجمنٹ</h4>
+          <div className="bottom-nav-buttons">
+            <button
+              className="bottom-nav-btn secondary"
+              onClick={() => handleNavigation('./AdminPanel')}
+            >
+              <span className="btn-icon">👨‍💼</span>
+              <span className="btn-text">ایڈمن پینل</span>
+            </button>
+            <div className="sync-wrapper">
+              <SyncToCloudButton />
+            </div>
+          </div>
+        </div>
+      </div>
+
       <LogoutButton />
-      <button
-        onClick={() => {
-          handleNavigation('./AdminPanel')
-        }}
-      >
-        goto admin panel
-      </button>
-      <button
-        onClick={() => {
-          handleNavigation('./AkhrajatSummary')
-        }}
-      >
-        goto Akhrajat Summary
-      </button>
-      <button
-        onClick={() => {
-          handleNavigation('./TrollySummary')
-        }}
-      >
-        goto Trolly Summary
-      </button>
-      <button
-        onClick={() => {
-          handleNavigation('./TransactionSummary')
-        }}
-      >
-        goto Transaction Summary
-      </button>
-      <SyncToCloudButton />
     </div>
   )
 }

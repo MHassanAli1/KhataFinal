@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import './SyncToCloudButton.css'
 
 const SyncToCloudButton = () => {
   const URL_CLOUD = `https://khataremote-production.up.railway.app`
@@ -135,14 +136,25 @@ const SyncToCloudButton = () => {
   }
 
   return (
-    <button
-      onClick={handleSync}
-      disabled={syncing}
-      className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700"
-    >
-      {syncing ? 'Syncing...' : 'Sync to Cloud'}
-      {message && <div className="text-xs mt-1 text-gray-500">{message}</div>}
-    </button>
+    <div className="sync-button-container">
+      <button
+        onClick={handleSync}
+        disabled={syncing}
+        className="sync-cloud-btn"
+      >
+        <span className="sync-btn-icon">
+          {syncing ? '🔄' : '☁️'}
+        </span>
+        <span className="sync-btn-text">
+          {syncing ? 'سینک ہو رہا ہے...' : 'کلاؤڈ میں سینک کریں'}
+        </span>
+      </button>
+      {message && (
+        <div className={`sync-message ${message.includes('✅') ? 'success' : 'error'}`}>
+          {message}
+        </div>
+      )}
+    </div>
   )
 }
 

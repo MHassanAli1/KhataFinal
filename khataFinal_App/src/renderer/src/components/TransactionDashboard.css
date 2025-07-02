@@ -108,9 +108,22 @@
 .table-container {
   background: white;
   border-radius: 16px;
-  overflow: hidden;
+  overflow-x: auto; /* Changed from hidden to auto to allow horizontal scrolling */
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
   border: 1px solid #e5e7eb;
+  max-width: 100%;
+  position: relative; /* Added for proper z-index handling */
+}
+
+/* When an editing is active, ensure table is positioned correctly */
+.table-container:has(.editing-row) {
+  z-index: 400;
+}
+
+/* Create a class for the table container when editing is active */
+.editing-active {
+  position: relative;
+  z-index: 400;
 }
 
 /* Table styles */
@@ -118,6 +131,7 @@ table {
   width: 100%;
   border-collapse: collapse;
   font-size: 14px;
+  table-layout: fixed; /* Added for better column width management */
 }
 
 thead {
@@ -132,6 +146,7 @@ thead th {
   border-bottom: 3px solid #e2e8f0;
   white-space: nowrap;
   font-size: 15px;
+  min-width: 100px; /* Ensure minimum width for column headers */
 }
 
 tbody tr {
@@ -157,10 +172,60 @@ tbody tr:nth-child(even):hover {
   background: linear-gradient(135deg, #fef3cd 0%, #fde68a 100%) !important;
   box-shadow: 0 4px 12px rgba(245, 158, 11, 0.2);
   border: 2px solid #f59e0b !important;
+  position: relative;
+  transform: scale(1.02);
+  z-index: 10;
+  white-space: nowrap; /* Prevent wrapping */
+}
+
+/* Add a modal-like effect for editing rows */
+.editing-row::after {
+  content: '';
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: -1;
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  pointer-events: none;
+}
+
+/* Improve the appearance of the editing row */
+.editing-row {
+  position: relative;
+  z-index: 500;
+  animation: popUpEffect 0.3s ease-out;
+  box-shadow: 0 8px 32px rgba(245, 158, 11, 0.4) !important;
+}
+
+@keyframes popUpEffect {
+  0% {
+    transform: scale(1);
+    opacity: 0.8;
+  }
+  50% {
+    transform: scale(1.04);
+  }
+  100% {
+    transform: scale(1.02);
+    opacity: 1;
+  }
 }
 
 .editing-row:hover {
   background: linear-gradient(135deg, #fef3cd 0%, #fde68a 100%) !important;
+  transform: scale(1.02);
+}
+
+.editing-row td {
+  padding: 20px 14px !important;
+  vertical-align: middle !important;
+  direction: rtl !important;
+  white-space: normal; /* Allow wrapping in the cell content */
+  min-width: 100px; /* Ensure minimum width for cells */
 }
 
 tbody td {
@@ -174,31 +239,81 @@ tbody td {
 /* Input fields in table */
 .edit-input {
   width: 100% !important;
-  padding: 10px 12px !important;
+  min-width: 80px !important; /* Ensure minimum width for inputs */
+  padding: 12px 16px !important;
   border: 2px solid #f59e0b !important;
-  border-radius: 8px !important;
-  font-size: 14px !important;
+  border-radius: 10px !important;
+  font-size: 15px !important;
   background: white !important;
   color: #1f2937 !important;
   font-weight: 600 !important;
   text-align: center !important;
   transition: all 0.3s ease !important;
-  box-shadow: 0 2px 8px rgba(245, 158, 11, 0.2) !important;
+  box-shadow: 0 3px 10px rgba(245, 158, 11, 0.25) !important;
+  direction: ltr !important;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  min-height: 40px;
+  box-sizing: border-box;
+  margin: 0 auto; /* Center the input */
+  position: relative;
+  z-index: 510;
+  animation: inputPop 0.4s ease-out;
 }
 
-.edit-input:focus {
-  outline: none !important;
-  border-color: #d97706 !important;
-  box-shadow: 0 0 0 4px rgba(245, 158, 11, 0.2) !important;
-  transform: scale(1.02) !important;
+@keyframes inputPop {
+  0% {
+    transform: scale(0.95);
+    opacity: 0.7;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
 }
 
 /* Action buttons container */
 .action-buttons {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 8px;
   align-items: center;
+  direction: rtl;
+}
+
+/* Enhanced action buttons for editing row */
+.editing-row .action-buttons {
+  gap: 10px;
+  padding: 8px 4px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 150px; /* Ensure buttons have enough space */
+  white-space: normal; /* Allow button text to wrap if needed */
+  position: relative;
+  z-index: 510;
+}
+
+/* Save and cancel buttons in edit mode */
+.save-button, 
+.cancel-button {
+  animation: buttonPop 0.4s ease-out;
+  transform-origin: center;
+  position: relative;
+  z-index: 520;
+}
+
+@keyframes buttonPop {
+  0% {
+    transform: scale(0.9);
+    opacity: 0.8;
+  }
+  50% {
+    transform: scale(1.1);
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
 }
 
 /* Button styles */
@@ -216,6 +331,8 @@ button {
   justify-content: center;
   gap: 6px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  min-width: 100px;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
 }
 
 button:hover {
@@ -232,11 +349,33 @@ button:hover {
 .save-button {
   background: linear-gradient(135deg, #10b981 0%, #059669 100%) !important;
   color: white !important;
+  font-size: 14px !important;
+  padding: 10px 18px !important;
+  border-radius: 10px !important;
+  font-weight: 700 !important;
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3) !important;
+}
+
+.save-button:hover {
+  background: linear-gradient(135deg, #059669 0%, #047857 100%) !important;
+  transform: translateY(-3px) !important;
+  box-shadow: 0 6px 20px rgba(16, 185, 129, 0.4) !important;
 }
 
 .cancel-button {
   background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%) !important;
   color: white !important;
+  font-size: 14px !important;
+  padding: 10px 18px !important;
+  border-radius: 10px !important;
+  font-weight: 700 !important;
+  box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3) !important;
+}
+
+.cancel-button:hover {
+  background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%) !important;
+  transform: translateY(-3px) !important;
+  box-shadow: 0 6px 20px rgba(239, 68, 68, 0.4) !important;
 }
 
 .delete-button {
@@ -349,77 +488,425 @@ button:hover {
   left: 0;
   width: 100%;
   height: 100%;
-  background-color: rgba(0, 0, 0, 0.6);
+  background-color: rgba(0, 0, 0, 0.75);
   display: flex;
   justify-content: center;
   align-items: center;
   z-index: 1000;
-  backdrop-filter: blur(8px);
+  backdrop-filter: blur(12px);
+  animation: modalFadeIn 0.3s ease-out;
+  padding: 20px;
+  box-sizing: border-box;
+}
+
+@keyframes modalFadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }
 
 .modal-content {
-  background: white;
+  background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
   padding: 40px;
   border-radius: 20px;
-  box-shadow: 0 24px 48px rgba(0, 0, 0, 0.2);
+  box-shadow: 
+    0 25px 50px rgba(0, 0, 0, 0.25),
+    0 0 0 1px rgba(255, 255, 255, 0.05);
   text-align: center;
-  max-width: 450px;
-  width: 90%;
-  border: 1px solid #e5e7eb;
+  max-width: 480px;
+  width: 100%;
+  border: 2px solid #e2e8f0;
   position: relative;
+  direction: rtl;
+  animation: modalSlideIn 0.3s ease-out;
+  transform-origin: center;
+  margin: auto;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+@keyframes modalSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-30px) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
 }
 
 .modal-icon {
-  font-size: 48px;
-  margin-bottom: 16px;
+  font-size: 56px;
+  margin-bottom: 20px;
+  filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.1));
+  animation: modalIconPulse 0.6s ease-out;
+}
+
+@keyframes modalIconPulse {
+  0% {
+    transform: scale(0.8);
+    opacity: 0;
+  }
+  50% {
+    transform: scale(1.05);
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
 }
 
 .modal-content h3 {
-  color: #1f2937;
-  font-size: 20px;
+  color: #1e293b;
+  font-size: 22px;
   font-weight: 700;
   margin-bottom: 16px;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  line-height: 1.4;
 }
 
 .modal-content p {
-  color: #6b7280;
+  color: #475569;
   font-size: 16px;
   margin-bottom: 32px;
   line-height: 1.6;
+  font-weight: 500;
+  text-align: center;
+  direction: rtl;
+  unicode-bidi: embed;
 }
 
 .modal-buttons {
   display: flex;
   gap: 16px;
   justify-content: center;
+  flex-wrap: wrap;
+  direction: rtl;
+  align-items: center;
+}
+
+.confirm-delete-button,
+.confirm-save-button,
+.cancel-modal-button {
+  padding: 14px 28px !important;
+  font-size: 15px !important;
+  font-weight: 600 !important;
+  border: none !important;
+  border-radius: 12px !important;
+  cursor: pointer !important;
+  transition: all 0.3s ease !important;
+  min-width: 130px;
+  position: relative;
+  overflow: hidden;
+  text-align: center;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
 }
 
 .confirm-delete-button {
   background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%) !important;
   color: white !important;
-  padding: 12px 24px !important;
-  font-size: 15px !important;
+  box-shadow: 0 6px 20px rgba(239, 68, 68, 0.3) !important;
+}
+
+.confirm-delete-button:hover {
+  background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%) !important;
+  transform: translateY(-2px) !important;
+  box-shadow: 0 8px 25px rgba(239, 68, 68, 0.4) !important;
 }
 
 .confirm-save-button {
   background: linear-gradient(135deg, #10b981 0%, #059669 100%) !important;
   color: white !important;
-  padding: 12px 24px !important;
-  font-size: 15px !important;
+  box-shadow: 0 6px 20px rgba(16, 185, 129, 0.3) !important;
+}
+
+.confirm-save-button:hover {
+  background: linear-gradient(135deg, #059669 0%, #047857 100%) !important;
+  transform: translateY(-2px) !important;
+  box-shadow: 0 8px 25px rgba(16, 185, 129, 0.4) !important;
 }
 
 .cancel-modal-button {
-  background: linear-gradient(135deg, #f3f4f6 0%, #e5e7eb 100%) !important;
-  color: #374151 !important;
-  padding: 12px 24px !important;
-  font-size: 15px !important;
+  background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%) !important;
+  color: #475569 !important;
+  border: 2px solid #cbd5e1 !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1) !important;
 }
 
+.cancel-modal-button:hover {
+  background: linear-gradient(135deg, #e2e8f0 0%, #cbd5e1 100%) !important;
+  color: #334155 !important;
+  transform: translateY(-2px) !important;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.15) !important;
+  border-color: #94a3b8 !important;
+}
 
+/* Active states */
+.confirm-delete-button:active,
+.confirm-save-button:active,
+.cancel-modal-button:active {
+  transform: translateY(0) !important;
+}
+
+/* Responsive modal design */
+@media (max-width: 768px) {
+  .modal {
+    padding: 15px;
+  }
+  
+  .modal-content {
+    padding: 30px 20px;
+    max-width: none;
+    width: 100%;
+    margin: 0;
+  }
+  
+  .modal-content h3 {
+    font-size: 18px;
+    margin-bottom: 12px;
+  }
+  
+  .modal-content p {
+    font-size: 14px;
+    margin-bottom: 24px;
+    line-height: 1.5;
+  }
+  
+  .modal-buttons {
+    flex-direction: column;
+    gap: 12px;
+    width: 100%;
+  }
+  
+  .confirm-delete-button,
+  .confirm-save-button,
+  .cancel-modal-button {
+    width: 100% !important;
+    min-width: auto;
+    padding: 12px 20px !important;
+    font-size: 14px !important;
+  }
+  
+  .modal-icon {
+    font-size: 44px;
+    margin-bottom: 16px;
+  }
+}
+
+@media (max-width: 480px) {
+  .modal {
+    padding: 10px;
+  }
+  
+  .modal-content {
+    padding: 24px 16px;
+    border-radius: 16px;
+  }
+  
+  .modal-content h3 {
+    font-size: 16px;
+  }
+  
+  .modal-content p {
+    font-size: 13px;
+    margin-bottom: 20px;
+  }
+  
+  .modal-icon {
+    font-size: 40px;
+    margin-bottom: 12px;
+  }
+}
 
 .edit-input,
 .edit-input select {
   padding: 6px;
   font-size: 14px;
   min-width: 120px;
+}
+
+/* Bottom Navigation Styles */
+.bottom-navigation {
+  margin-top: 48px;
+  padding: 32px;
+  background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+  border-radius: 20px;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+}
+
+.bottom-nav-section {
+  margin-bottom: 32px;
+}
+
+.bottom-nav-section:last-child {
+  margin-bottom: 0;
+}
+
+.section-title {
+  color: #1e293b;
+  font-size: 18px;
+  font-weight: 700;
+  margin-bottom: 20px;
+  padding-bottom: 8px;
+  border-bottom: 2px solid #e2e8f0;
+  text-align: center;
+}
+
+.bottom-nav-buttons {
+  display: flex;
+  gap: 16px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.bottom-nav-btn {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 24px !important;
+  border: none !important;
+  border-radius: 14px !important;
+  font-size: 16px !important;
+  font-weight: 600 !important;
+  cursor: pointer;
+  transition: all 0.3s ease !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1) !important;
+  min-width: 200px;
+  justify-content: center;
+  text-decoration: none;
+}
+
+.bottom-nav-btn.primary {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
+  color: white !important;
+}
+
+.bottom-nav-btn.primary:hover {
+  background: linear-gradient(135deg, #5a67d8 0%, #6b46c1 100%) !important;
+  transform: translateY(-3px) !important;
+  box-shadow: 0 8px 24px rgba(102, 126, 234, 0.3) !important;
+}
+
+.bottom-nav-btn.secondary {
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%) !important;
+  color: white !important;
+}
+
+.bottom-nav-btn.secondary:hover {
+  background: linear-gradient(135deg, #047857 0%, #065f46 100%) !important;
+  transform: translateY(-3px) !important;
+  box-shadow: 0 8px 24px rgba(16, 185, 129, 0.3) !important;
+}
+
+.btn-icon {
+  font-size: 20px;
+  opacity: 0.9;
+}
+
+.btn-text {
+  font-size: 15px;
+  white-space: nowrap;
+}
+
+.sync-wrapper {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+/* Responsive design for bottom navigation */
+@media (max-width: 768px) {
+  .bottom-nav-buttons {
+    flex-direction: column;
+    align-items: center;
+  }
+  
+  .bottom-nav-btn {
+    width: 100%;
+    max-width: 300px;
+  }
+  
+  .bottom-navigation {
+    padding: 24px 16px;
+    margin-top: 32px;
+  }
+}
+
+/* Keyboard Toggle Button */
+.keyboard-toggle {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  width: 56px;
+  height: 56px;
+  background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%) !important;
+  color: white !important;
+  border: none !important;
+  border-radius: 50% !important;
+  box-shadow: 0 4px 16px rgba(139, 92, 246, 0.3) !important;
+  cursor: pointer;
+  z-index: 998;
+  transition: all 0.3s ease !important;
+  font-size: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.keyboard-toggle:hover {
+  transform: translateY(-3px) scale(1.05) !important;
+  box-shadow: 0 8px 24px rgba(139, 92, 246, 0.4) !important;
+  background: linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%) !important;
+}
+
+.keyboard-toggle:active {
+  transform: translateY(-1px) scale(1.02) !important;
+}
+
+/* Table body with editing */
+tbody {
+  position: relative;
+}
+
+/* Create an overlay effect for the entire application when editing */
+body:has(.editing-row) {
+  overflow: hidden;
+}
+
+/* Fallback for browsers that don't support :has() */
+.editing-active-body {
+  overflow: hidden;
+}
+
+/* Create a global overlay when editing */
+.editing-active-body::after {
+  content: '';
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 300;
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  pointer-events: none;
+  animation: fadeIn 0.3s ease-out;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }
