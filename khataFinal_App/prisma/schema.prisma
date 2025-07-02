@@ -91,3 +91,10 @@ model AkhrajatTitle {
   id   Int    @id @default(autoincrement())
   name String @unique
 }
+
+model DeletedTransaction {
+  id             Int      @id @default(autoincrement())
+  transactionId  Int      @unique
+  deletedAt      DateTime @default(now())
+}
+

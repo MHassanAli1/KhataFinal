@@ -252,6 +252,14 @@ const transactionHandlers = (ipcMain) => {
       })
       if (!transaction) throw new Error('Transaction not found')
 
+      // ➡️ store in DeletedTransaction
+      await prisma.deletedTransaction.create({
+        data: {
+          transactionId: parsedId
+        }
+      })
+
+      // continue deleting as before
       await prisma.akhrajat.deleteMany({ where: { transactionId: parsedId } })
       await prisma.trolly.deleteMany({ where: { transactionId: parsedId } })
       await prisma.transaction.delete({ where: { id: parsedId } })
@@ -269,6 +277,13 @@ const transactionHandlers = (ipcMain) => {
         where: { bookNumber }
       })
       const idsToDelete = transactions.map((t) => t.id)
+
+      // store in DeletedTransaction
+      for (const tid of idsToDelete) {
+        await prisma.deletedTransaction.create({
+          data: { transactionId: tid }
+        })
+      }
 
       await prisma.akhrajat.deleteMany({ where: { transactionId: { in: idsToDelete } } })
       await prisma.trolly.deleteMany({ where: { transactionId: { in: idsToDelete } } })
@@ -299,6 +314,13 @@ const transactionHandlers = (ipcMain) => {
         }
       })
       const idsToDelete = toDelete.map((t) => t.id)
+
+      // store in DeletedTransaction
+      for (const tid of idsToDelete) {
+        await prisma.deletedTransaction.create({
+          data: { transactionId: tid }
+        })
+      }
 
       await prisma.akhrajat.deleteMany({ where: { transactionId: { in: idsToDelete } } })
       await prisma.trolly.deleteMany({ where: { transactionId: { in: idsToDelete } } })
@@ -373,6 +395,30 @@ const transactionHandlers = (ipcMain) => {
     } catch (err) {
       console.error('getActiveBookByKhda Error:', err)
       throw new Error('کھدہ کے لیے فعال کتاب حاصل کرنے میں ناکامی')
+    }
+  })
+
+  ipcMain.handle('transactions:markSynced', async (event, { id, syncedAt }) => {
+    return await prisma.transaction.update({
+      where: { id },
+      data: {
+        Synced: true,
+        SyncedAt: new Date(syncedAt)
+      }
+    })
+  })
+  ipcMain.handle('transactions:getDeleted', async () => {
+    return await prisma.deletedTransaction.findMany()
+  })
+  ipcMain.handle('transactions:clearDeleted', async (event, ids) => {
+    try {
+      await prisma.deletedTransaction.deleteMany({
+        where: { transactionId: { in: ids } }
+      })
+      return { message: 'DeletedTransaction cleared.' }
+    } catch (err) {
+      console.error('Clear Deleted Error:', err)
+      throw new Error('Failed to clear deleted transactions')
     }
   })
 }

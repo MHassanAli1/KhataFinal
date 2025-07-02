@@ -22,7 +22,10 @@ const api = {
     deleteFromTicket: (id) => ipcRenderer.invoke('transactions:deleteFromTicket', id),
     search: (query) => ipcRenderer.invoke('transactions:search', query),
     getOne: (id) => ipcRenderer.invoke('transaction:getOne', id),
-    getLatestByKhda: (khdaName) => ipcRenderer.invoke('transactions:getLatestByKhda', khdaName)
+    getLatestByKhda: (khdaName) => ipcRenderer.invoke('transactions:getLatestByKhda', khdaName),
+    markSynced: (data) => ipcRenderer.invoke('transactions:markSynced', data),
+    getDeleted: () => ipcRenderer.invoke('transactions:getDeleted'),
+    clearDeleted: (ids) => ipcRenderer.invoke('transactions:clearDeleted', ids)
   },
   akhrajat: {
     create: (data) => ipcRenderer.invoke('akhrajat:create', data),

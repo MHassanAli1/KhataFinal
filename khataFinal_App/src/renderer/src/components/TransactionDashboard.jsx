@@ -710,7 +710,13 @@ function TransactionDashboard() {
       >
         goto Transaction Summary
       </button>
-      {/* <SyncButton /> */}
+      <button
+        onClick={() => {
+          handleNavigation('.SyncToCloudButton')
+        }}
+      >
+        Sync to Cloud
+      </button>
     </div>
   )
 }

@@ -40,6 +40,10 @@ const akhrajatHandlers = (ipcMain) => {
           transaction: { connect: { id: parseInt(transactionId) } }
         }
       })
+      await prisma.transaction.update({
+        where: { id: parseInt(transactionId) },
+        data: {} // will bump updatedAt
+      })
 
       return newEntry
     } catch (err) {
@@ -78,6 +82,15 @@ const akhrajatHandlers = (ipcMain) => {
           date: date ? new Date(date) : undefined
         }
       })
+      const parentTx = await prisma.akhrajat.findUnique({
+        where: { id: parsedId }
+      })
+      if (parentTx) {
+        await prisma.transaction.update({
+          where: { id: parentTx.transactionId },
+          data: {}
+        })
+      }
 
       return updated
     } catch (err) {
@@ -94,6 +107,12 @@ const akhrajatHandlers = (ipcMain) => {
       const deleted = await prisma.akhrajat.delete({
         where: { id: parsedId }
       })
+      if (deleted?.transactionId) {
+        await prisma.transaction.update({
+          where: { id: deleted.transactionId },
+          data: {}
+        })
+      }
 
       return deleted
     } catch (err) {

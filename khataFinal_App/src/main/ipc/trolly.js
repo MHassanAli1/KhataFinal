@@ -18,6 +18,10 @@ const trollyHandlers = (ipcMain) => {
           total
         }
       })
+      await prisma.transaction.update({
+        where: { id: updated.transactionId },
+        data: {}
+      })
 
       return updated
     } catch (err) {
