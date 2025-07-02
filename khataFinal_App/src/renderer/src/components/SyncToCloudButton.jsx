@@ -47,6 +47,12 @@ const SyncToCloudButton = () => {
               })
             })
 
+            if (response.status === 404) {
+              // server does not know about this id
+              console.warn(`⚠️ Transaction ${tx.id} not found on server, retrying as POST`)
+              throw new Error('Not found')
+            }
+
             if (!response.ok) throw new Error('Update failed')
 
             await window.api.transactions.markSynced({
@@ -56,7 +62,52 @@ const SyncToCloudButton = () => {
 
             console.log(`✅ Synced update: Transaction ${tx.id}`)
           } catch (err) {
-            console.error(`❌ Failed to sync update for tx ${tx.id}`, err)
+            console.error(`❌ Failed to sync update for tx ${tx.id}, will retry as POST`, err)
+
+            // fallback to POST
+            try {
+              const createResponse = await fetch(`${URL_CLOUD}/transactions`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  id: tx.id, // 👈 add this
+                  ZoneName: tx.ZoneName,
+                  KhdaName: tx.KhdaName,
+                  KulAmdan: tx.KulAmdan.toString(),
+                  bookNumber: tx.bookNumber,
+                  ticketNumber: tx.ticketNumber,
+                  date: tx.date,
+                  KulAkhrajat: tx.KulAkhrajat.toString(),
+                  SaafiAmdan: tx.SaafiAmdan.toString(),
+                  Exercise: tx.Exercise.toString(),
+                  KulMaizan: tx.KulMaizan.toString(),
+                  trollies: tx.trollies.map((t) => ({
+                    id: t.id, // 👈 add this too if you want to sync trolly id
+                    total: t.total,
+                    StartingNum: t.StartingNum.toString(),
+                    EndingNum: t.EndingNum.toString()
+                  })),
+                  akhrajat: tx.akhrajat.map((a) => ({
+                    id: a.id, // 👈 add this too if you want to sync akhrajat id
+                    title: a.title,
+                    description: a.description,
+                    amount: a.amount.toString(),
+                    date: a.date
+                  }))
+                })
+              })
+
+              if (!createResponse.ok) throw new Error('POST fallback failed')
+
+              await window.api.transactions.markSynced({
+                id: tx.id,
+                syncedAt: new Date().toISOString()
+              })
+
+              console.log(`✅ Synced create fallback for tx ${tx.id}`)
+            } catch (postErr) {
+              console.error(`❌ Failed to sync fallback POST for tx ${tx.id}`, postErr)
+            }
           }
         }
       }
@@ -69,7 +120,7 @@ const SyncToCloudButton = () => {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
-                userID: tx.userID,
+                id: tx.id, // 👈 add this
                 ZoneName: tx.ZoneName,
                 KhdaName: tx.KhdaName,
                 KulAmdan: tx.KulAmdan.toString(),
@@ -81,11 +132,13 @@ const SyncToCloudButton = () => {
                 Exercise: tx.Exercise.toString(),
                 KulMaizan: tx.KulMaizan.toString(),
                 trollies: tx.trollies.map((t) => ({
+                  id: t.id, // 👈 add this
                   total: t.total,
                   StartingNum: t.StartingNum.toString(),
                   EndingNum: t.EndingNum.toString()
                 })),
                 akhrajat: tx.akhrajat.map((a) => ({
+                  id: a.id, // 👈 add this
                   title: a.title,
                   description: a.description,
                   amount: a.amount.toString(),
@@ -137,14 +190,8 @@ const SyncToCloudButton = () => {
 
   return (
     <div className="sync-button-container">
-      <button
-        onClick={handleSync}
-        disabled={syncing}
-        className="sync-cloud-btn"
-      >
-        <span className="sync-btn-icon">
-          {syncing ? '🔄' : '☁️'}
-        </span>
+      <button onClick={handleSync} disabled={syncing} className="sync-cloud-btn">
+        <span className="sync-btn-icon">{syncing ? '🔄' : '☁️'}</span>
         <span className="sync-btn-text">
           {syncing ? 'سینک ہو رہا ہے...' : 'کلاؤڈ میں سینک کریں'}
         </span>
