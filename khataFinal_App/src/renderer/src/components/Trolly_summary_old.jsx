@@ -21,46 +21,36 @@ export default function TrollySummary() {
     window.api.admin.khdas.getAllkhdas().then((khdas) => setKhdaList(khdas.map((k) => k.name)))
   }, [])
 
-  // Apply filters
-  const filteredTrollies = trollies.filter((item) => {
-    const txn = item.transaction || {}
+  const filteredTrollies = trollies.filter((t) => {
+    const txn = t.transaction || {}
 
     const matchesZone = !filterZone || txn.ZoneName === filterZone
     const matchesKhda = !filterKhda || txn.KhdaName === filterKhda
 
+    // new book number filter
+    const matchesBookNumber =
+      !filterBookNumber || (txn.bookNumber && txn.bookNumber.toString().includes(filterBookNumber))
+
     let matchesDate = true
     if (filterStartDate || filterEndDate) {
-      const itemDate = txn.date ? new Date(txn.date) : null
-      if (itemDate) {
+      const txnDate = txn.date ? new Date(txn.date) : null
+      if (txnDate) {
+        const txnDateOnly = new Date(txnDate.getFullYear(), txnDate.getMonth(), txnDate.getDate())
         if (filterStartDate) {
           const start = new Date(filterStartDate)
-          if (itemDate < start) matchesDate = false
+          if (txnDateOnly < start) matchesDate = false
         }
         if (filterEndDate && matchesDate) {
           const end = new Date(filterEndDate)
-          if (itemDate > end) matchesDate = false
+          if (txnDateOnly > end) matchesDate = false
         }
       } else {
         matchesDate = false
       }
     }
 
-    const matchesBookNumber =
-      !filterBookNumber || (txn.bookNumber && txn.bookNumber.toString().includes(filterBookNumber))
-
     return matchesZone && matchesKhda && matchesDate && matchesBookNumber
   })
-
-  // Group sums by zone and khda combination
-  const sumsByZoneKhda = filteredTrollies.reduce((acc, item) => {
-    const txn = item.transaction || {}
-    const key = `${txn.ZoneName || 'نامعلوم'} - ${txn.KhdaName || 'نامعلوم'}`
-    acc[key] = (acc[key] || 0) + Number(item.total || 0)
-    return acc
-  }, {})
-
-  // Calculate grand total
-  const grandTotal = Object.values(sumsByZoneKhda).reduce((acc, sum) => acc + sum, 0)
 
   return (
     <div className="trolly-summary">
@@ -71,9 +61,9 @@ export default function TrollySummary() {
 
       <div className="filters">
         <label>
-          زون منتخب کریں:
+          زون:
           <select value={filterZone} onChange={(e) => setFilterZone(e.target.value)}>
-            <option value="">تمام</option>
+            <option value="">تمام زون</option>
             {zoneList.map((zone) => (
               <option key={zone.id} value={zone.name}>
                 {zone.name}
@@ -81,19 +71,6 @@ export default function TrollySummary() {
             ))}
           </select>
         </label>
-
-        <label>
-          کھدہ منتخب کریں:
-          <select value={filterKhda} onChange={(e) => setFilterKhda(e.target.value)}>
-            <option value="">تمام</option>
-            {khdaList.map((khda) => (
-              <option key={khda} value={khda}>
-                {khda}
-              </option>
-            ))}
-          </select>
-        </label>
-
         <label>
           کتاب نمبر:
           <input
@@ -101,6 +78,17 @@ export default function TrollySummary() {
             value={filterBookNumber}
             onChange={(e) => setFilterBookNumber(e.target.value)}
           />
+        </label>
+        <label>
+          کھدہ:
+          <select value={filterKhda} onChange={(e) => setFilterKhda(e.target.value)}>
+            <option value="">تمام کھدے</option>
+            {khdaList.map((khda) => (
+              <option key={khda} value={khda}>
+                {khda}
+              </option>
+            ))}
+          </select>
         </label>
 
         <label>
@@ -122,30 +110,35 @@ export default function TrollySummary() {
         </label>
       </div>
 
-      <div className="summary-table">
+      <div className="table-container">
         <table>
           <thead>
             <tr>
-              <th>زون - کھدہ</th>
-              <th>کل مجموعہ</th>
+              <th>زون</th>
+              <th>کھدہ</th>
+              <th>تاریخ</th>
+              <th>ابتدائی نمبر</th>
+              <th>اختتامی نمبر</th>
+              <th>کل</th>
             </tr>
           </thead>
           <tbody>
-            {Object.entries(sumsByZoneKhda).map(([zoneKhda, sum]) => (
-              <tr key={zoneKhda}>
-                <td>{zoneKhda}</td>
-                <td>{sum.toLocaleString()}</td>
+            {filteredTrollies.map((trolly) => (
+              <tr key={trolly.id}>
+                <td>{trolly.transaction?.ZoneName || '—'}</td>
+                <td>{trolly.transaction?.KhdaName || '—'}</td>
+                <td>
+                  {trolly.transaction?.date
+                    ? new Date(trolly.transaction.date).toLocaleDateString()
+                    : '—'}
+                </td>
+                <td>{trolly.StartingNum}</td>
+                <td>{trolly.EndingNum}</td>
+                <td>{trolly.total}</td>
               </tr>
             ))}
-            {Object.keys(sumsByZoneKhda).length > 0 && (
-              <tr className="grand-total">
-                <td><strong>گرینڈ ٹوٹل</strong></td>
-                <td><strong>{grandTotal.toLocaleString()}</strong></td>
-              </tr>
-            )}
           </tbody>
         </table>
-        {Object.keys(sumsByZoneKhda).length === 0 && <p>کوئی ڈیٹا نہیں ملا</p>}
       </div>
     </div>
   )
