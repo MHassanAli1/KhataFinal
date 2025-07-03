@@ -1,5 +1,6 @@
 .container {
   padding: 1rem;
+  font-size: 1.1rem; /* Increased base font size */
 }
 
 .section {
@@ -7,7 +8,7 @@
 }
 
 .section-title {
-  font-size: 1.25rem;
+  font-size: 1.5rem; /* Increased from 1.25rem */
   font-weight: bold;
   border-bottom: 1px solid #000;
   padding-bottom: 0.5rem;
@@ -30,6 +31,7 @@
 .zone-title {
   font-weight: 600;
   text-align: right;
+  font-size: 1.2rem; /* Increased font size */
 }
 
 .button-group {
@@ -47,12 +49,14 @@
   padding: 0.25rem;
   flex: 1;
   text-align: right;
+  font-size: 1.1rem; /* Increased font size */
 }
 
 .select-input {
   border: 1px solid #000;
   padding: 0.25rem;
   text-align: right;
+  font-size: 1.1rem; /* Increased font size */
 }
 
 .button-save {
@@ -62,6 +66,7 @@
   border-radius: 0.25rem;
   border: none;
   cursor: pointer;
+  font-size: 1rem; /* Increased font size */
 }
 
 .button-cancel {
@@ -71,6 +76,7 @@
   border-radius: 0.25rem;
   border: none;
   cursor: pointer;
+  font-size: 1rem; /* Increased font size */
 }
 
 .button-edit {
@@ -80,6 +86,7 @@
   border-radius: 0.25rem;
   border: none;
   cursor: pointer;
+  font-size: 1rem; /* Increased font size */
 }
 
 .button-delete {
@@ -89,12 +96,14 @@
   border-radius: 0.25rem;
   border: none;
   cursor: pointer;
+  font-size: 1rem; /* Increased font size */
 }
 
 .khda-list {
   padding-right: 1rem;
   list-style-type: disc;
   text-align: right;
+  font-size: 1.1rem; /* Increased font size */
 }
 
 .khda-item {
@@ -108,6 +117,7 @@
   list-style-type: disc;
   text-align: right;
   margin-bottom: 0.25rem;
+  font-size: 1.1rem; /* Increased font size */
 }
 
 .title-item {
@@ -128,6 +138,7 @@
   border: none;
   width: 100%;
   cursor: pointer;
+  font-size: 1.1rem; /* Increased font size */
 }
 
 /* Keyboard button style */

@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
+import './TransactionSummary.css'
 
 export default function TransactionSummary() {
   const [transactions, setTransactions] = useState([])
@@ -52,7 +53,7 @@ export default function TransactionSummary() {
       <button type="button" className="return-btn" onClick={() => navigate('/')}>
         ⬅️ واپس جائیں
       </button>
-      <h2>ٹرانزیکشن خلاصہ</h2>
+      <h2>ریکارڈ کا خلاصہ</h2>
 
       {/* filters */}
       <div className="filters">

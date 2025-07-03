@@ -211,7 +211,7 @@ function TransactionDashboard() {
         >
           📝 فارم
         </button>
-        <h2>ٹرانزیکشن ڈیش بورڈ</h2>
+        <h2>ریکارڈ ڈیش بورڈ</h2>
         <button className="nav-button report-button" onClick={() => handleNavigation('/report')}>
           📊 اعداد و شمار
         </button>
@@ -539,7 +539,7 @@ function TransactionDashboard() {
                                 setPendingDelete({
                                   id: txn.id,
                                   confirmMessage:
-                                    'کیا آپ واقعی اس ٹرانزیکشن کو حذف کرنا چاہتے ہیں؟',
+                                    'کیا آپ واقعی اس ریکارڈ کو حذف کرنا چاہتے ہیں؟',
                                   mode: 'single'
                                 })
                               }
@@ -721,7 +721,7 @@ function TransactionDashboard() {
               onClick={() => handleNavigation('./TransactionSummary')}
             >
               <span className="btn-icon">📈</span>
-              <span className="btn-text">ٹرانزیکشن کا خلاصہ</span>
+              <span className="btn-text">ریکارڈ کا خلاصہ</span>
             </button>
           </div>
         </div>

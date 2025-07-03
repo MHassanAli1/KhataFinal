@@ -333,7 +333,7 @@ export default function CreateTransactionForm() {
         <button type="button" className="return-btn" onClick={handleReturn}>
           ⬅️ واپس جائیں
         </button>
-        <h2>نیا ٹرانزیکشن شامل کریں</h2>
+        <h2>نیا ریکارڈ شامل کریں</h2>
       </div>
 
       {formError && (

@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import './AkhrajatSummary.css';
 
 export default function AkhrajatSummary() {
   const [akhrajat, setAkhrajat] = useState([]);
