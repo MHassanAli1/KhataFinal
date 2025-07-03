@@ -4,7 +4,7 @@ import { useState } from 'react'
 import './SyncToCloudButton.css'
 
 const SyncToCloudButton = () => {
-// Contact the developers at ahmadhhassan30nov@gmail.com or muhammadhassanali327@gmail.com to get the cloud database backup URL
+// Contact the developers at ahmadhassan30nov@gmail.com or muhammadhassanali327@gmail.com to get the cloud database backup URL
   const URL_CLOUD = `Ask Developer for the CLOUD DATABASE BACKUP URL`
   const [syncing, setSyncing] = useState(false)
   const [message, setMessage] = useState('')
