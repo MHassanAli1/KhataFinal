@@ -30,21 +30,39 @@ export default function AdminPanel() {
   const navigate = useNavigate()
 
   // Handle keyboard functionality
+
+  // helper to update active input state consistently
+  const updateActiveInput = (updater) => {
+    switch (activeInput) {
+      case 'newZone':
+        setNewZone(updater(newZone))
+        break
+      case 'newKhda':
+        setNewKhda(updater(newKhda))
+        break
+      case 'newTitle':
+        setNewTitle(updater(newTitle))
+        break
+      default:
+        if (activeInput?.startsWith('editZone-')) {
+          setEditingZoneName(updater(editingZoneName))
+        } else if (activeInput?.startsWith('editKhda-')) {
+          setEditingKhdaName(updater(editingKhdaName))
+        } else if (activeInput?.startsWith('editTitle-')) {
+          setEditingTitleName(updater(editingTitleName))
+        }
+        break
+    }
+  }
+
   const handleKeyPress = (char) => {
     if (!activeInput) return
 
-    const element = document.getElementById(activeInput)
-    if (!element) return
-
     if (char === 'backspace') {
-      element.value = element.value.slice(0, -1)
+      updateActiveInput((prev) => prev.slice(0, -1))
     } else {
-      element.value += char
+      updateActiveInput((prev) => prev + char)
     }
-
-    // Trigger change event to update state
-    const event = new Event('input', { bubbles: true })
-    element.dispatchEvent(event)
   }
 
   const closeKeyboard = () => {
@@ -390,7 +408,13 @@ export default function AdminPanel() {
         onClick={() => setShowKeyboard(!showKeyboard)}
         aria-label="Toggle Urdu Keyboard"
       >
-        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="white">
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          width="24"
+          height="24"
+          viewBox="0 0 24 24"
+          fill="white"
+        >
           <path d="M20,5H4C2.9,5 2,5.9 2,7V17C2,18.1 2.9,19 4,19H20C21.1,19 22,18.1 22,17V7C22,5.9 21.1,5 20,5M5,8H7V10H5V8M5,11H7V13H5V11M8,8H10V10H8V8M8,11H10V13H8V11M11,8H13V10H11V8M11,11H13V13H11V11M14,8H16V10H14V8M14,11H16V13H14V11M17,8H19V10H17V8M17,11H19V13H17V11M12,14H19V16H12V14M5,14H10V16H5V14Z" />
         </svg>
       </button>
