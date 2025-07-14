@@ -1,3 +1,4 @@
 provider: generic
-url: https://example.com/auto-updates
+url: https://your-update-server.com/updates
+channel: latest
 updaterCacheDirName: khata-updater

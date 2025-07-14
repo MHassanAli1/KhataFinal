@@ -98,6 +98,7 @@
 /* Number Input */
 .form-input[type="number"] {
   -moz-appearance: textfield;
+  appearance: textfield;
 }
 
 .form-input[type="number"]::-webkit-outer-spin-button,
@@ -321,25 +322,32 @@
   position: fixed;
   bottom: 20px;
   right: 20px;
-  width: 50px;
-  height: 50px;
+  width: 56px;
+  height: 56px;
+  min-width: 56px;
+  min-height: 56px;
+  max-width: 56px;
+  max-height: 56px;
   border-radius: 50%;
-  background-color: #3498db;
+  background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);
   color: white;
   border: none;
-  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
-  font-size: 20px;
+  box-shadow: 0 4px 16px rgba(139, 92, 246, 0.3);
+  font-size: 22px;
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
   z-index: 1001;
   transition: transform 0.2s, background-color 0.2s;
+  overflow: hidden; /* Ensure content doesn't affect shape */
+  padding: 0; /* Remove any padding that might affect shape */
 }
 
 .keyboard-toggle:hover {
-  background-color: #2980b9;
-  transform: scale(1.1);
+  background: linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%);
+  transform: translateY(-3px) scale(1.05);
+  box-shadow: 0 8px 24px rgba(139, 92, 246, 0.4);
 }
 
 /* Highlight active input */

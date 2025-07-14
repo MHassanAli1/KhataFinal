@@ -5,6 +5,7 @@ import TransactionDetails from './TransactionDetails'
 import UrduKeyboard from './UrduKeyboard' // Import UrduKeyboard component
 import { LogoutButton } from './logout'
 import SyncToCloudButton from './SyncToCloudButton'
+import CheckForUpdates from './CheckForUpdates'
 
 function TransactionDashboard() {
   const [transactions, setTransactions] = useState([])
@@ -691,7 +692,7 @@ function TransactionDashboard() {
         onClick={() => setShowKeyboard(!showKeyboard)}
         aria-label="Toggle Urdu Keyboard"
       >
-        ⌨️
+        <span role="img" aria-label="keyboard">⌨️</span>
       </button>
 
       {/* Urdu Keyboard */}
@@ -717,6 +718,13 @@ function TransactionDashboard() {
               <span className="btn-text">ٹرالی کا خلاصہ</span>
             </button>
             <button
+              className="bottom-nav-btn secondary"
+              onClick={() => handleNavigation('./TrollySummaryold')}
+            >
+              <span className="btn-icon">📋</span>
+              <span className="btn-text">ٹرالی کی تفصیل</span>
+            </button>
+            <button
               className="bottom-nav-btn primary"
               onClick={() => handleNavigation('./TransactionSummary')}
             >
@@ -738,6 +746,9 @@ function TransactionDashboard() {
             </button>
             <div className="sync-wrapper">
               <SyncToCloudButton />
+            </div>
+            <div className="sync-wrapper">
+              <CheckForUpdates />
             </div>
           </div>
         </div>

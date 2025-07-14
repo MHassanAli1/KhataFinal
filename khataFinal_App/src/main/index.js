@@ -1,6 +1,7 @@
-import { app, shell, BrowserWindow, ipcMain } from 'electron'
+import { app, shell, BrowserWindow, ipcMain, dialog } from 'electron'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
+import { autoUpdater } from 'electron-updater'
 
 // Use the book icon from resources directory
 const getIconPath = () => {
@@ -83,6 +84,67 @@ function createWindow() {
   }
 }
 
+// Auto-updater configuration
+function setupAutoUpdater() {
+  // Log update events
+  autoUpdater.logger = console;
+  autoUpdater.autoDownload = true;
+  autoUpdater.autoInstallOnAppQuit = true;
+
+  // Check for updates when the app starts
+  autoUpdater.checkForUpdatesAndNotify();
+
+  // Event handlers
+  autoUpdater.on('checking-for-update', () => {
+    console.log('Checking for updates...');
+  });
+
+  autoUpdater.on('update-available', (info) => {
+    console.log('Update available:', info);
+    // Notify the user that an update is available
+    dialog.showMessageBox({
+      type: 'info',
+      title: 'اپڈیٹ دستیاب ہے',
+      message: 'آپ کی ایپلیکیشن کا ایک نیا ورژن دستیاب ہے۔',
+      detail: `ورژن ${info.version} ڈاؤنلوڈ کیا جا رہا ہے۔ اپڈیٹ کی تکمیل پر آپ کو مطلع کیا جائے گا۔`,
+      buttons: ['ٹھیک ہے']
+    });
+  });
+
+  autoUpdater.on('update-not-available', () => {
+    console.log('No updates available');
+  });
+
+  autoUpdater.on('download-progress', (progress) => {
+    console.log(`Download progress: ${progress.percent.toFixed(2)}%`);
+  });
+
+  autoUpdater.on('update-downloaded', (info) => {
+    console.log('Update downloaded:', info);
+    // Prompt the user to install the update
+    dialog.showMessageBox({
+      type: 'info',
+      title: 'اپڈیٹ تیار ہے',
+      message: 'اپڈیٹ ڈاؤنلوڈ ہو چکا ہے۔',
+      detail: 'ایپلیکیشن کو بند کر کے نیا ورژن انسٹال کرنے کے لیے "انسٹال اور ریسٹارٹ" پر کلک کریں۔',
+      buttons: ['انسٹال اور ریسٹارٹ', 'بعد میں']
+    }).then(({ response }) => {
+      if (response === 0) {
+        autoUpdater.quitAndInstall();
+      }
+    });
+  });
+
+  autoUpdater.on('error', (error) => {
+    console.error('Auto-updater error:', error);
+  });
+
+  // Allow manual check for updates
+  ipcMain.on('check-for-updates', () => {
+    autoUpdater.checkForUpdatesAndNotify();
+  });
+}
+
 // This method will be called when Electron has finished
 // initialization and is ready to create browser windows.
 // Some APIs can only be used after this event occurs.
@@ -124,6 +186,13 @@ app.on('window-all-closed', () => {
     app.quit()
   }
 })
+
+// Call the setup function after the app is ready
+app.on('ready', () => {
+  if (!is.dev) {
+    setupAutoUpdater();
+  }
+});
 
 // In this file you can include the rest of your app's specific main process
 // code. You can also put them in separate files and require them here.

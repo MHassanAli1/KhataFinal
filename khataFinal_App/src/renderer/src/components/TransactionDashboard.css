@@ -847,6 +847,10 @@ button:hover {
   right: 20px;
   width: 56px;
   height: 56px;
+  min-width: 56px;
+  min-height: 56px;
+  max-width: 56px;
+  max-height: 56px;
   background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%) !important;
   color: white !important;
   border: none !important;
@@ -859,6 +863,8 @@ button:hover {
   display: flex;
   align-items: center;
   justify-content: center;
+  overflow: hidden; /* Ensure content doesn't affect shape */
+  padding: 0; /* Remove any padding that might affect shape */
 }
 
 .keyboard-toggle:hover {

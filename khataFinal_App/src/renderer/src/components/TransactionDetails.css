@@ -841,6 +841,25 @@
   bottom: 20px;
   right: 20px;
   z-index: 999;
+  width: 56px;
+  height: 56px;
+  min-width: 56px;
+  min-height: 56px;
+  max-width: 56px;
+  max-height: 56px;
+  background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);
+  color: white;
+  border: none;
+  border-radius: 50%;
+  box-shadow: 0 4px 16px rgba(139, 92, 246, 0.3);
+  font-size: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  overflow: hidden; /* Ensure content doesn't affect shape */
+  padding: 0; /* Remove any padding that might affect shape */
 }
 
 /* Active input highlighting */

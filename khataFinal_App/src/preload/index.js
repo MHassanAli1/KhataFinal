@@ -64,7 +64,12 @@ const api = {
       delete: (id) => ipcRenderer.invoke('akhrajatTitles:delete', id),
       update: (data) => ipcRenderer.invoke('akhrajatTitles:update', data)
     }
-  }
+  },
+
+  // Add IPC channel for app updates
+  ipc: {
+    send: (channel, ...args) => ipcRenderer.send(channel, ...args)
+  },
 }
 
 if (process.contextIsolated) {

@@ -582,7 +582,7 @@ export default function CreateTransactionForm() {
         onClick={() => setShowKeyboard(!showKeyboard)}
         aria-label="Toggle Urdu Keyboard"
       >
-        ⌨️
+        <span role="img" aria-label="keyboard">⌨️</span>
       </button>
 
       {/* Render the Urdu keyboard when needed */}

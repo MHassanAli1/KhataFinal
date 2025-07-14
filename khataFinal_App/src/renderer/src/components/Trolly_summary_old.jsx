@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import './TrollySummary.css'
+import './Trolly_Summary_old.css'
 
 export default function TrollySummary() {
   const navigate = useNavigate()

@@ -6,6 +6,7 @@ import AdminPanel from './components/AdminPanel.jsx'
 import AkhrajatSummary from './components/AkhrajatSummary.jsx'
 import TrollySummary from './components/TrollySummary.jsx'
 import TransactionSummary from './components/TransactionSummary.jsx'
+import Trolly_Summary_old from './components/Trolly_summary_old.jsx'
 
 function App() {
   return (
@@ -18,6 +19,7 @@ function App() {
         <Route path="/AkhrajatSummary" element={<AkhrajatSummary />} />
         <Route path="/TrollySummary" element={<TrollySummary />} />
         <Route path="/TransactionSummary" element={<TransactionSummary />} />
+         <Route path="/TrollySummaryold" element={<Trolly_Summary_old />} />
       </Routes>
     </Router>
   )
