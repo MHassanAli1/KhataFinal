@@ -18,7 +18,8 @@ const api = {
     getById: (id) => ipcRenderer.invoke('transactions:getById', id),
     update: (payload) => ipcRenderer.invoke('transactions:update', payload),
     delete: (id) => ipcRenderer.invoke('transactions:delete', id),
-    deleteBookByNumber: (bookNumber) => ipcRenderer.invoke('transactions:deleteBookByNumber', bookNumber),
+    deleteBookByNumber: (bookNumber) =>
+      ipcRenderer.invoke('transactions:deleteBookByNumber', bookNumber),
     deleteFromTicket: (id) => ipcRenderer.invoke('transactions:deleteFromTicket', id),
     search: (query) => ipcRenderer.invoke('transactions:search', query),
     getOne: (id) => ipcRenderer.invoke('transaction:getOne', id),
@@ -63,13 +64,34 @@ const api = {
       create: (name) => ipcRenderer.invoke('akhrajatTitles:create', name),
       delete: (id) => ipcRenderer.invoke('akhrajatTitles:delete', id),
       update: (data) => ipcRenderer.invoke('akhrajatTitles:update', data)
+    },
+
+    gariTitles: {
+      getAll: () => ipcRenderer.invoke('gariTitles:getAll'),
+      create: (name) => ipcRenderer.invoke('gariTitles:create', name),
+      delete: (id) => ipcRenderer.invoke('gariTitles:delete', id),
+      update: (data) => ipcRenderer.invoke('gariTitles:update', data)
+    },
+
+    gariExpenseTypes: {
+      getAll: () => ipcRenderer.invoke('gariExpenseTypes:getAll'),
+      create: (name) => ipcRenderer.invoke('gariExpenseTypes:create', name),
+      delete: (id) => ipcRenderer.invoke('gariExpenseTypes:delete', id),
+      update: (data) => ipcRenderer.invoke('gariExpenseTypes:update', data)
+    },
+
+    gariParts: {
+      getAll: () => ipcRenderer.invoke('gariParts:getAll'),
+      create: (name) => ipcRenderer.invoke('gariParts:create', name),
+      delete: (id) => ipcRenderer.invoke('gariParts:delete', id),
+      update: (data) => ipcRenderer.invoke('gariParts:update', data)
     }
   },
 
   // Add IPC channel for app updates
   ipc: {
     send: (channel, ...args) => ipcRenderer.send(channel, ...args)
-  },
+  }
 }
 
 if (process.contextIsolated) {

@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 import './AdminPanel.css'
 import { useNavigate } from 'react-router-dom'
 import { LogoutButton } from './logout'
@@ -27,6 +27,25 @@ export default function AdminPanel() {
   const [editingTitle, setEditingTitle] = useState(null)
   const [editingTitleName, setEditingTitleName] = useState('')
 
+  const [gariTitles, setGariTitles] = useState([])
+  const [gariExpenseTypes, setGariExpenseTypes] = useState([])
+  const [gariParts, setGariParts] = useState([])
+
+  // Gari Titles
+  const [newGariTitle, setNewGariTitle] = useState('')
+  const [editingGariTitle, setEditingGariTitle] = useState(null)
+  const [editingGariTitleName, setEditingGariTitleName] = useState('')
+
+  // Gari Expense Types
+  const [newExpenseType, setNewExpenseType] = useState('')
+  const [editingExpenseType, setEditingExpenseType] = useState(null)
+  const [editingExpenseTypeName, setEditingExpenseTypeName] = useState('')
+
+  // Gari Parts
+  const [newGariPart, setNewGariPart] = useState('')
+  const [editingGariPart, setEditingGariPart] = useState(null)
+  const [editingGariPartName, setEditingGariPartName] = useState('')
+
   const navigate = useNavigate()
 
   // Handle keyboard functionality
@@ -42,6 +61,15 @@ export default function AdminPanel() {
         break
       case 'newTitle':
         setNewTitle(updater(newTitle))
+        break
+      case 'newGariTitle':
+        setNewGariTitle(updater(newGariTitle))
+        break
+      case 'newExpenseType':
+        setNewExpenseType(updater(newExpenseType))
+        break
+      case 'newGariPart':
+        setNewGariPart(updater(newGariPart))
         break
       default:
         if (activeInput?.startsWith('editZone-')) {
@@ -80,6 +108,14 @@ export default function AdminPanel() {
     setZones(z)
     const t = await window.api.admin.akhrajatTitles.getAll()
     setTitles(t)
+    const gt = await window.api.admin.gariTitles.getAll()
+    setGariTitles(gt)
+
+    const et = await window.api.admin.gariExpenseTypes.getAll()
+    setGariExpenseTypes(et)
+
+    const gp = await window.api.admin.gariParts.getAll()
+    setGariParts(gp)
   }
 
   useEffect(() => {
@@ -358,20 +394,24 @@ export default function AdminPanel() {
             ) : (
               <li key={title.id} className="title-item">
                 {title.name}
-                <div className="button-group">
-                  <button
-                    onClick={() => {
-                      setEditingTitle(title.id)
-                      setEditingTitleName(title.name)
-                    }}
-                    className="button-edit"
-                  >
-                    ترمیم
-                  </button>
-                  <button onClick={() => deleteTitle(title.id)} className="button-delete">
-                    حذف
-                  </button>
-                </div>
+                {title.isGari ? (
+                  <strong style={{ color: 'green', marginRight: '1rem' }}>گاڑی</strong>
+                ) : (
+                  <div className="button-group">
+                    <button
+                      onClick={() => {
+                        setEditingTitle(title.id)
+                        setEditingTitleName(title.name)
+                      }}
+                      className="button-edit"
+                    >
+                      ترمیم
+                    </button>
+                    <button onClick={() => deleteTitle(title.id)} className="button-delete">
+                      حذف
+                    </button>
+                  </div>
+                )}
               </li>
             )
           )}
@@ -395,6 +435,258 @@ export default function AdminPanel() {
             onChange={(e) => setNewTitle(e.target.value)}
             onFocus={handleFocus}
             id="newTitle"
+            className="input-text"
+          />
+          <button className="button-submit">شامل کریں</button>
+        </form>
+      </div>
+
+      <div className="section">
+        <h2 className="section-title">گاڑیوں کے نام</h2>
+        <ul className="title-list">
+          {gariTitles.map((gari) =>
+            editingGariTitle === gari.id ? (
+              <div key={gari.id} className="flex-container">
+                <input
+                  type="text"
+                  value={editingGariTitleName}
+                  onChange={(e) => setEditingGariTitleName(e.target.value)}
+                  onFocus={handleFocus}
+                  id={`editGariTitle-${gari.id}`}
+                  className="input-text"
+                />
+                <button
+                  onClick={async () => {
+                    await window.api.admin.gariTitles.update({
+                      id: gari.id,
+                      name: editingGariTitleName
+                    })
+                    setEditingGariTitle(null)
+                    setEditingGariTitleName('')
+                    loadData()
+                  }}
+                  className="button-save"
+                >
+                  محفوظ کریں
+                </button>
+                <button onClick={() => setEditingGariTitle(null)} className="button-cancel">
+                  منسوخ
+                </button>
+              </div>
+            ) : (
+              <li key={gari.id} className="title-item">
+                {gari.name}
+                <div className="button-group">
+                  <button
+                    onClick={() => {
+                      setEditingGariTitle(gari.id)
+                      setEditingGariTitleName(gari.name)
+                    }}
+                    className="button-edit"
+                  >
+                    ترمیم
+                  </button>
+                  <button
+                    onClick={async () => {
+                      await window.api.admin.gariTitles.delete(gari.id)
+                      loadData()
+                    }}
+                    className="button-delete"
+                  >
+                    حذف
+                  </button>
+                </div>
+              </li>
+            )
+          )}
+        </ul>
+
+        <form
+          onSubmit={async (e) => {
+            e.preventDefault()
+            if (newGariTitle.trim()) {
+              await window.api.admin.gariTitles.create(newGariTitle.trim())
+              setNewGariTitle('')
+              loadData()
+            }
+          }}
+          className="form"
+        >
+          <input
+            type="text"
+            placeholder="گاڑی کا نام"
+            value={newGariTitle}
+            onChange={(e) => setNewGariTitle(e.target.value)}
+            onFocus={handleFocus}
+            id="newGariTitle"
+            className="input-text"
+          />
+          <button className="button-submit">شامل کریں</button>
+        </form>
+      </div>
+
+      <div className="section">
+        <h2 className="section-title">گاڑی اخراجات کی اقسام</h2>
+        <ul className="title-list">
+          {gariExpenseTypes.map((et) =>
+            editingExpenseType === et.id ? (
+              <div key={et.id} className="flex-container">
+                <input
+                  type="text"
+                  value={editingExpenseTypeName}
+                  onChange={(e) => setEditingExpenseTypeName(e.target.value)}
+                  onFocus={handleFocus}
+                  id={`editExpenseType-${et.id}`}
+                  className="input-text"
+                />
+                <button
+                  onClick={async () => {
+                    await window.api.admin.gariExpenseTypes.update({
+                      id: et.id,
+                      name: editingExpenseTypeName
+                    })
+                    setEditingExpenseType(null)
+                    setEditingExpenseTypeName('')
+                    loadData()
+                  }}
+                  className="button-save"
+                >
+                  محفوظ کریں
+                </button>
+                <button onClick={() => setEditingExpenseType(null)} className="button-cancel">
+                  منسوخ
+                </button>
+              </div>
+            ) : (
+              <li key={et.id} className="title-item">
+                {et.name}
+                <div className="button-group">
+                  <button
+                    onClick={() => {
+                      setEditingExpenseType(et.id)
+                      setEditingExpenseTypeName(et.name)
+                    }}
+                    className="button-edit"
+                  >
+                    ترمیم
+                  </button>
+                  <button
+                    onClick={async () => {
+                      await window.api.admin.gariExpenseTypes.delete(et.id)
+                      loadData()
+                    }}
+                    className="button-delete"
+                  >
+                    حذف
+                  </button>
+                </div>
+              </li>
+            )
+          )}
+        </ul>
+
+        <form
+          onSubmit={async (e) => {
+            e.preventDefault()
+            if (newExpenseType.trim()) {
+              await window.api.admin.gariExpenseTypes.create(newExpenseType.trim())
+              setNewExpenseType('')
+              loadData()
+            }
+          }}
+          className="form"
+        >
+          <input
+            type="text"
+            placeholder="اخراجات کی قسم"
+            value={newExpenseType}
+            onChange={(e) => setNewExpenseType(e.target.value)}
+            onFocus={handleFocus}
+            id="newExpenseType"
+            className="input-text"
+          />
+          <button className="button-submit">شامل کریں</button>
+        </form>
+      </div>
+
+      <div className="section">
+        <h2 className="section-title">گاڑی کے پرزے</h2>
+        <ul className="title-list">
+          {gariParts.map((part) =>
+            editingGariPart === part.id ? (
+              <div key={part.id} className="flex-container">
+                <input
+                  type="text"
+                  value={editingGariPartName}
+                  onChange={(e) => setEditingGariPartName(e.target.value)}
+                  onFocus={handleFocus}
+                  id={`editGariPart-${part.id}`}
+                  className="input-text"
+                />
+                <button
+                  onClick={async () => {
+                    await window.api.admin.gariParts.update({
+                      id: part.id,
+                      name: editingGariPartName
+                    })
+                    setEditingGariPart(null)
+                    setEditingGariPartName('')
+                    loadData()
+                  }}
+                  className="button-save"
+                >
+                  محفوظ کریں
+                </button>
+                <button onClick={() => setEditingGariPart(null)} className="button-cancel">
+                  منسوخ
+                </button>
+              </div>
+            ) : (
+              <li key={part.id} className="title-item">
+                {part.name}
+                <div className="button-group">
+                  <button
+                    onClick={() => {
+                      setEditingGariPart(part.id)
+                      setEditingGariPartName(part.name)
+                    }}
+                    className="button-edit"
+                  >
+                    ترمیم
+                  </button>
+                  <button
+                    onClick={async () => {
+                      await window.api.admin.gariParts.delete(part.id)
+                      loadData()
+                    }}
+                    className="button-delete"
+                  >
+                    حذف
+                  </button>
+                </div>
+              </li>
+            )
+          )}
+        </ul>
+
+        <form
+          onSubmit={async (e) => {
+            e.preventDefault()
+            if (newGariPart.trim()) {
+              await window.api.admin.gariParts.create(newGariPart.trim())
+              setNewGariPart('')
+              loadData()
+            }
+          }}
+          className="form"
+        >
+          <input
+            type="text"
+            placeholder="نیا پرزہ"
+            value={newGariPart}
+            onChange={(e) => setNewGariPart(e.target.value)}
+            onFocus={handleFocus}
+            id="newGariPart"
             className="input-text"
           />
           <button className="button-submit">شامل کریں</button>

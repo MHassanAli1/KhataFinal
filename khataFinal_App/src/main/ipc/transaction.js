@@ -99,27 +99,73 @@ const transactionHandlers = (ipcMain) => {
             ]
           },
           akhrajat: {
-            create: akhrajat
-              .filter((a) => a.title && a.amount !== undefined && a.amount !== null)
-              .map((a) => {
-                if (!validTitleNames.includes(a.title)) {
-                  throw new Error(`غلط اخراجات کا عنوان: ${a.title}`)
-                }
-                if (a.description && !isUrdu(a.description)) {
-                  throw new Error('اخراجات کی تفصیل صرف اردو میں درج کریں۔')
-                }
-                return {
-                  title: a.title,
-                  description: a.description || null,
-                  amount: BigInt(a.amount),
-                  date: date ? new Date(date) : new Date()
-                }
-              })
+            create: await Promise.all(
+              akhrajat
+                .filter((a) => a.title && a.amount !== undefined && a.amount !== null)
+                .map(async (a) => {
+                  if (!validTitleNames.includes(a.title)) {
+                    throw new Error(`غلط اخراجات کا عنوان: ${a.title}`)
+                  }
+
+                  if (a.description && !isUrdu(a.description)) {
+                    throw new Error('اخراجات کی تفصیل صرف اردو میں درج کریں۔')
+                  }
+
+                  const base = {
+                    title: a.title,
+                    description: a.description || null,
+                    amount: BigInt(a.amount),
+                    date: date ? new Date(date) : new Date(),
+                    isGari: a.isGari || false,
+                    isOther: a.isOther || false
+                  }
+
+                  if (a.isGari) {
+                    const gariExpenseData = (a.gariExpenses || []).map((g) => {
+                      if (!g.title) throw new Error('گاڑی کا خرچ درکار ہے')
+
+                      const title = g.title
+                      const quantity = g.quantity !== '' ? Number(g.quantity) : null
+                      const part = g.part?.trim() || null
+
+                      if (
+                        ['پٹرول', 'ڈیزل'].includes(title) &&
+                        (quantity === null || isNaN(quantity))
+                      ) {
+                        throw new Error(`${title} کے لیے درست مقدار درکار ہے`)
+                      }
+
+                      if (title === 'مرمت' && !part) {
+                        throw new Error('مرمت کے لیے پرزہ درکار ہے')
+                      }
+
+                      return {
+                        title,
+                        quantity,
+                        part
+                      }
+                    })
+
+                    return {
+                      ...base,
+                      gariExpense: {
+                        create: gariExpenseData
+                      }
+                    }
+                  }
+
+                  return base
+                })
+            )
           }
         },
         include: {
           trollies: true,
-          akhrajat: true
+          akhrajat: {
+            include: {
+              gariExpense: true
+            }
+          }
         }
       })
 

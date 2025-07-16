@@ -134,4 +134,106 @@ export const registerAdminHandlers = (ipcMain) => {
       data: { name }
     })
   })
+
+  // ----------------------------
+  // Gari Titles
+  // ----------------------------
+  ipcMain.handle('gariTitles:getAll', async () => {
+    return await prisma.gariTitle.findMany()
+  })
+
+  ipcMain.handle('gariTitles:create', async (event, name) => {
+    const newGari = await prisma.gariTitle.create({
+      data: { name }
+    })
+
+    await prisma.akhrajatTitle.create({
+      data: { name, isGari: true }
+    })
+
+    return newGari
+  })
+
+  // Update gariTitles:update to also update AkhrajatTitle
+  ipcMain.handle('gariTitles:update', async (event, { id, name }) => {
+    const updated = await prisma.gariTitle.update({
+      where: { id: Number(id) },
+      data: { name }
+    })
+
+    await prisma.akhrajatTitle.updateMany({
+      where: { name: updated.name, isGari: true },
+      data: { name }
+    })
+
+    return updated
+  })
+
+  // Update gariTitles:delete to also delete from AkhrajatTitle
+  ipcMain.handle('gariTitles:delete', async (event, id) => {
+    const deleted = await prisma.gariTitle.delete({
+      where: { id: Number(id) }
+    })
+
+    await prisma.akhrajatTitle.deleteMany({
+      where: {
+        name: deleted.name,
+        isGari: true
+      }
+    })
+
+    return deleted
+  })
+
+  // ----------------------------
+  // Gari Expense Type Titles
+  // ----------------------------
+  ipcMain.handle('gariExpenseTypes:getAll', async () => {
+    return await prisma.gariExpenseTypeTitle.findMany()
+  })
+
+  ipcMain.handle('gariExpenseTypes:create', async (event, name) => {
+    return await prisma.gariExpenseTypeTitle.create({
+      data: { name }
+    })
+  })
+
+  ipcMain.handle('gariExpenseTypes:update', async (event, { id, name }) => {
+    return await prisma.gariExpenseTypeTitle.update({
+      where: { id: Number(id) },
+      data: { name }
+    })
+  })
+
+  ipcMain.handle('gariExpenseTypes:delete', async (event, id) => {
+    return await prisma.gariExpenseTypeTitle.delete({
+      where: { id: Number(id) }
+    })
+  })
+
+  // ----------------------------
+  // Gari Parts
+  // ----------------------------
+  ipcMain.handle('gariParts:getAll', async () => {
+    return await prisma.gariParts.findMany()
+  })
+
+  ipcMain.handle('gariParts:create', async (event, name) => {
+    return await prisma.gariParts.create({
+      data: { name }
+    })
+  })
+
+  ipcMain.handle('gariParts:update', async (event, { id, name }) => {
+    return await prisma.gariParts.update({
+      where: { id: Number(id) },
+      data: { name }
+    })
+  })
+
+  ipcMain.handle('gariParts:delete', async (event, id) => {
+    return await prisma.gariParts.delete({
+      where: { id: Number(id) }
+    })
+  })
 }

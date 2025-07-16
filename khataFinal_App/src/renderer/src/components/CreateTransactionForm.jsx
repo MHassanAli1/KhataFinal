@@ -30,6 +30,10 @@ export default function CreateTransactionForm() {
   const [activeTicketNumber, setActiveTicketNumber] = useState(1)
   const [formError, setFormError] = useState('')
 
+  const [gariTitles, setGariTitles] = useState([])
+  const [gariExpenseTypes, setGariExpenseTypes] = useState([])
+  const [gariParts, setGariParts] = useState([])
+
   // Keyboard state
   const [showKeyboard, setShowKeyboard] = useState(false)
   const [activeInput, setActiveInput] = useState(null)
@@ -76,6 +80,20 @@ export default function CreateTransactionForm() {
     // fetch akhrajat titles
     window.api.admin.akhrajatTitles.getAll().then((titles) => {
       setAkhrajatTitles(titles.map((t) => t.name)) // assuming t.name is Urdu
+    })
+
+    // fetch Gari Expense Types (پٹرول, ڈیزل, مرمت, ٹیوننگ etc.)
+    window.api.admin.gariExpenseTypes.getAll().then((types) => {
+      setGariExpenseTypes(types.map((t) => t.name))
+    })
+
+    // fetch Gari Parts (mobil oil, air filter etc.)
+    window.api.admin.gariParts.getAll().then((parts) => {
+      setGariParts(parts.map((p) => p.name))
+    })
+
+    window.api.admin.gariTitles.getAll().then((titles) => {
+      setGariTitles(titles.map((t) => t.name)) // assume name is Urdu name of vehicle
     })
 
     // Initialize refs
@@ -232,7 +250,7 @@ export default function CreateTransactionForm() {
   }
 
   const addAkhrajat = () => {
-    setAkhrajat([...akhrajat, { description: '', amount: '' }])
+    setAkhrajat([...akhrajat, { description: '', amount: '', title: '', gariExpenses: [] }])
   }
 
   const updateAkhrajat = (index, field, value) => {
@@ -241,6 +259,14 @@ export default function CreateTransactionForm() {
 
   const removeAkhrajat = (index) => {
     setAkhrajat((prev) => prev.filter((_, i) => i !== index))
+
+    setTimeout(() => {
+      const rebuiltRefs = {}
+      akhrajat.forEach((_, i) => {
+        rebuiltRefs[`desc-${i}`] = React.createRef()
+      })
+      akhrajatRefs.current = rebuiltRefs
+    }, 0)
 
     // Clean up refs for removed items
     const newAkhrajatRefs = { ...akhrajatRefs.current }
@@ -288,6 +314,19 @@ export default function CreateTransactionForm() {
         setFormError('براہ کرم کتاب نمبر درج کریں۔')
         return
       }
+      const hasIncompleteGari = akhrajat.some((item) => {
+        if (!gariTitles.includes(item.title)) return false
+        const type = item.gariExpenses?.[0]?.title
+        if (!type) return true
+        if ((type === 'پٹرول' || type === 'ڈیزل') && !item.gariExpenses?.[0]?.quantity) return true
+        if (type === 'مرمت' && !item.gariExpenses?.[0]?.part) return true
+        return false
+      })
+
+      if (hasIncompleteGari) {
+        setFormError('گاڑی اخراجات کے مکمل تفصیل درج کریں۔')
+        return
+      }
 
       await window.api.transactions.create({
         userID: user.id,
@@ -305,6 +344,7 @@ export default function CreateTransactionForm() {
         date,
         akhrajat: akhrajat.map((item) => ({
           ...item,
+          isGari: gariTitles.includes(item.title), // ✅ Explicitly set
           date
         }))
       })
@@ -549,6 +589,67 @@ export default function CreateTransactionForm() {
                       dir="ltr"
                       onWheel={(e) => e.target.blur()}
                     />
+                    {gariTitles.includes(item.title) && (
+                      <div className="gari-expense-section">
+                        <label>گاڑی خرچ کی قسم:</label>
+                        <select
+                          className="form-select"
+                          value={item.gariExpenses?.[0]?.title || ''}
+                          onChange={(e) => {
+                            const title = e.target.value
+                            const updated = { title }
+
+                            if (['پٹرول', 'ڈیزل'].includes(title)) {
+                              updated.quantity = ''
+                            } else if (title === 'مرمت') {
+                              updated.part = ''
+                            }
+
+                            updateAkhrajat(index, 'gariExpenses', [updated])
+                          }}
+                        >
+                          <option value="">-- قسم منتخب کریں --</option>
+                          {gariExpenseTypes.map((type) => (
+                            <option key={type} value={type}>
+                              {type}
+                            </option>
+                          ))}
+                        </select>
+
+                        {['پٹرول', 'ڈیزل'].includes(item.gariExpenses?.[0]?.title) && (
+                          <input
+                            type="number"
+                            placeholder="مقدار (لیٹر)"
+                            className="form-input"
+                            value={item.gariExpenses[0]?.quantity || ''}
+                            onChange={(e) => {
+                              const updated = [...item.gariExpenses]
+                              updated[0].quantity = e.target.value
+                              updateAkhrajat(index, 'gariExpenses', updated)
+                            }}
+                          />
+                        )}
+
+                        {item.gariExpenses?.[0]?.title === 'مرمت' && (
+                          <select
+                            className="form-select"
+                            value={item.gariExpenses[0]?.part || ''}
+                            onChange={(e) => {
+                              const updated = [...item.gariExpenses]
+                              updated[0].part = e.target.value
+                              updateAkhrajat(index, 'gariExpenses', updated)
+                            }}
+                          >
+                            <option value="">-- پرزہ منتخب کریں --</option>
+                            {gariParts.map((part) => (
+                              <option key={part} value={part}>
+                                {part}
+                              </option>
+                            ))}
+                          </select>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </div>
                 <button
@@ -582,7 +683,9 @@ export default function CreateTransactionForm() {
         onClick={() => setShowKeyboard(!showKeyboard)}
         aria-label="Toggle Urdu Keyboard"
       >
-        <span role="img" aria-label="keyboard">⌨️</span>
+        <span role="img" aria-label="keyboard">
+          ⌨️
+        </span>
       </button>
 
       {/* Render the Urdu keyboard when needed */}

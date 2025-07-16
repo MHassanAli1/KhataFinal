@@ -19,23 +19,23 @@ model User {
 }
 
 model Transaction {
-  id          Int       @id @default(autoincrement())
-  userID      Int
-  user        User      @relation(fields: [userID], references: [id], onDelete: Cascade)
-  ZoneName    String
-  KhdaName    String
-  KulAmdan    BigInt
+  id           Int       @id @default(autoincrement())
+  userID       Int
+  user         User      @relation(fields: [userID], references: [id], onDelete: Cascade)
+  ZoneName     String
+  KhdaName     String
+  KulAmdan     BigInt
   bookNumber   String
   ticketNumber Int
-  date        DateTime
-  KulAkhrajat BigInt
-  SaafiAmdan  BigInt
-  Exercise    BigInt
-  KulMaizan   BigInt
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-  Synced      Boolean   @default(false)
-  SyncedAt    DateTime?
+  date         DateTime
+  KulAkhrajat  BigInt
+  SaafiAmdan   BigInt
+  Exercise     BigInt
+  KulMaizan    BigInt
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  Synced       Boolean   @default(false)
+  SyncedAt     DateTime?
 
   trollies Trolly[]
   akhrajat Akhrajat[]
@@ -54,14 +54,27 @@ model Trolly {
 }
 
 model Akhrajat {
-  id             Int        @id @default(autoincrement())
-  title          String
-  description    String?    // nullable if “Other”
-  amount         BigInt
-  date           DateTime   // NEW: date when the expense was made
+  id          Int      @id @default(autoincrement())
+  title       String
+  description String? // nullable if “Other”
+  amount      BigInt
+  date        DateTime // NEW: date when the expense was made
+  isGari      Boolean? @default(false)
+  isOther     Boolean? @default(false)
 
-  transactionId  Int
-  transaction    Transaction @relation(fields: [transactionId], references: [id], onDelete: Cascade)
+  transactionId Int
+  transaction   Transaction @relation(fields: [transactionId], references: [id], onDelete: Cascade)
+
+  gariExpense GariExpense[]
+}
+
+model GariExpense {
+  Id         Int      @id @default(autoincrement())
+  title      String
+  quantity   Int?
+  part       String?
+  akhrajatId Int
+  akhrajat   Akhrajat @relation(fields: [akhrajatId], references: [id], onDelete: Cascade)
 }
 
 model UsedBookNumber {
@@ -71,30 +84,43 @@ model UsedBookNumber {
   createdAt DateTime @default(now())
 }
 
-
 //For Admin Panel
 model Zone {
-  id        Int      @id @default(autoincrement())
-  name      String   @unique
-  khdas     Khda[]
+  id    Int    @id @default(autoincrement())
+  name  String @unique
+  khdas Khda[]
 }
 
 model Khda {
-  id        Int    @id @default(autoincrement())
-  name      String
-  zone      Zone   @relation(fields: [zoneId], references: [id], onDelete: Cascade)
-  zoneId    Int
-
+  id     Int    @id @default(autoincrement())
+  name   String
+  zone   Zone   @relation(fields: [zoneId], references: [id], onDelete: Cascade)
+  zoneId Int
 }
 
 model AkhrajatTitle {
+  id     Int     @id @default(autoincrement())
+  name   String  @unique
+  isGari Boolean @default(false)
+}
+
+model DeletedTransaction {
+  id            Int      @id @default(autoincrement())
+  transactionId Int      @unique
+  deletedAt     DateTime @default(now())
+}
+
+model GariTitle {
   id   Int    @id @default(autoincrement())
   name String @unique
 }
 
-model DeletedTransaction {
-  id             Int      @id @default(autoincrement())
-  transactionId  Int      @unique
-  deletedAt      DateTime @default(now())
+model GariExpenseTypeTitle {
+  id   Int    @id @default(autoincrement())
+  name String @unique
 }
 
+model GariParts {
+  id   Int    @id @default(autoincrement())
+  name String @unique
+}
