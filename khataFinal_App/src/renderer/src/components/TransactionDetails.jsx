@@ -4,6 +4,8 @@ import './TransactionDetails.css'
 /**
  * TransactionDetails
  * ------------------------------------------------------------
+ * - Always refetches a *full* transaction (with akhrajat.gariExpense[])
+ *   so read-mode summaries show correct gari expense type.
  * - Supports prisma relation name `gariExpense` (singular) or legacy `gariExpenses`.
  * - Displays Gari expense *type* + (quantity|part) + amount in read mode.
  * - Provides dropdown of Gari Parts when type is Repairing/مرمت.
@@ -85,9 +87,10 @@ export default function TransactionDetails({ transaction, onClose }) {
   const [gariExpense, setGariExpense] = useState({ title: '', quantity: '', part: '' })
   const [gariExpenseTypes, setGariExpenseTypes] = useState([]) // [{name}] or [string]
   const [gariParts, setGariParts] = useState([]) // [{name}] or [string]
+  const [loadingFull, setLoadingFull] = useState(false)
 
   /* --------------------------------------------------------------
-   * Load from props / lookups
+   * Initial shallow load from prop (fast paint; may lack gariExpense)
    * ------------------------------------------------------------ */
   useEffect(() => {
     const trolly = transaction.trollies?.[0]
@@ -100,6 +103,48 @@ export default function TransactionDetails({ transaction, onClose }) {
     setAkhrajatList(norm)
   }, [transaction])
 
+  /* --------------------------------------------------------------
+   * Guaranteed full fetch (ensures akhrajat.gariExpense[] present)
+   * ------------------------------------------------------------ */
+  useEffect(() => {
+    let active = true
+    const id = transaction?.id
+    if (!id) return
+    setLoadingFull(true)
+
+    // Prefer modern handler; fallback to legacy if needed.
+    const fetchFull =
+      window.api?.transactions?.getById?.(id) ??
+      window.api?.transaction?.getOne?.(id) ??
+      Promise.resolve(null)
+
+    Promise.resolve(fetchFull)
+      .then((full) => {
+        if (!active || !full) return
+        const trolly = full.trollies?.[0]
+        if (trolly) {
+          setStarting(BigInt(trolly.StartingNum || 0))
+          setEnding(BigInt(trolly.EndingNum || 0))
+          setTotal(Number(trolly.total) || 0)
+        }
+        const norm = (full.akhrajat || []).map(normalizeAkhrajatItem)
+        setAkhrajatList(norm)
+      })
+      .catch((err) => {
+        console.error('TransactionDetails: full fetch failed', err)
+      })
+      .finally(() => {
+        if (active) setLoadingFull(false)
+      })
+
+    return () => {
+      active = false
+    }
+  }, [transaction?.id])
+
+  /* --------------------------------------------------------------
+   * Admin lookups
+   * ------------------------------------------------------------ */
   useEffect(() => {
     window.api.admin.akhrajatTitles.getAll().then((titles) => {
       setAkhrajatTitles(titles || [])
@@ -458,6 +503,7 @@ export default function TransactionDetails({ transaction, onClose }) {
   return (
     <div className="transaction-details">
       {formError && <div className="form-error-toast">{formError}</div>}
+      {loadingFull && <div className="akhrajat-loading">…لوڈ ہو رہا ہے</div>}
 
       {/* Akhrajat List */}
       <div className="akhrajat-section">
