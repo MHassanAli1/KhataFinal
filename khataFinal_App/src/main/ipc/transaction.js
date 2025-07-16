@@ -190,7 +190,14 @@ const transactionHandlers = (ipcMain) => {
   ipcMain.handle('transactions:getAll', async () => {
     try {
       return await prisma.transaction.findMany({
-        include: { trollies: true, akhrajat: true }
+        include: {
+          trollies: true,
+          akhrajat: {
+            include: {
+              gariExpense: true
+            }
+          }
+        }
       })
     } catch (err) {
       console.error('Get All Error:', err)
@@ -198,19 +205,22 @@ const transactionHandlers = (ipcMain) => {
     }
   })
 
+  // src/main/ipc/transactionHandlers.js (example – adjust your actual filename)
   ipcMain.handle('transactions:getById', async (event, id) => {
-    try {
-      const parsedId = parseInt(id)
-      if (isNaN(parsedId)) throw new Error('Invalid ID')
+    const txId = parseInt(id, 10)
+    if (isNaN(txId)) throw new Error('Invalid transaction ID')
 
-      return await prisma.transaction.findUnique({
-        where: { id: parsedId },
-        include: { trollies: true, akhrajat: true }
-      })
-    } catch (err) {
-      console.error('Get By ID Error:', err)
-      throw new Error('Failed to get transaction')
-    }
+    return prisma.transaction.findUnique({
+      where: { id: txId },
+      include: {
+        trollies: true,
+        akhrajat: {
+          include: {
+            gariExpense: true // <-- CRITICAL
+          }
+        }
+      }
+    })
   })
 
   ipcMain.handle('transactions:update', async (event, { id, ...data }) => {
@@ -390,7 +400,14 @@ const transactionHandlers = (ipcMain) => {
             { KhdaName: { contains: query, mode: 'insensitive' } }
           ]
         },
-        include: { trollies: true, akhrajat: true }
+        include: {
+          trollies: true,
+          akhrajat: {
+            include: {
+              gariExpense: true
+            }
+          }
+        }
       })
     } catch (err) {
       console.error('Search Error:', err)
@@ -402,7 +419,14 @@ const transactionHandlers = (ipcMain) => {
     try {
       const transaction = await prisma.transaction.findUnique({
         where: { id },
-        include: { trollies: true, akhrajat: true }
+        include: {
+          trollies: true,
+          akhrajat: {
+            include: {
+              gariExpense: true
+            }
+          }
+        }
       })
       return transaction
     } catch (err) {
