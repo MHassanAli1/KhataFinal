@@ -61,16 +61,13 @@ export default function TransactionDetails({ transaction, onClose }) {
     if (!ge) return ''
     const slug = toSlug(ge.title)
     const label = displayLabel(ge.title)
-    const amtTxt = formatAmount(amt)
     if (slug === 'petrol' || slug === 'diesel') {
-      return `${label}${ge.quantity ? ` – مقدار: ${ge.quantity} لیٹر` : ''}${
-        amtTxt ? ` – ${amtTxt}` : ''
-      }`
+      return `${label}${ge.quantity ? ` – مقدار: ${ge.quantity} لیٹر` : ''}`
     }
     if (slug === 'repairing') {
-      return `${label}${ge.part ? `: ${ge.part}` : ''}${amtTxt ? ` – ${amtTxt}` : ''}`
+      return `${label}${ge.part ? `: ${ge.part}` : ''}`
     }
-    return `${label}${amtTxt ? ` – ${amtTxt}` : ''}`
+    return `${label}`
   }
 
   /* --------------------------------------------------------------
@@ -507,11 +504,13 @@ export default function TransactionDetails({ transaction, onClose }) {
 
       {/* Akhrajat List */}
       <div className="akhrajat-section">
-        <h4>اخراجات</h4>
+        <h4>اخراجات کی تفصیلات</h4>
         {akhrajatList.length === 0 ? (
-          <p>کوئی اخراجات نہیں ہیں</p>
+          <p className="no-data-message">کوئی اخراجات نہیں ہیں</p>
         ) : (
-          akhrajatList.map((item) => renderAkhrajatItem(item))
+          <div className="akhrajat-list">
+            {akhrajatList.map((item) => renderAkhrajatItem(item))}
+          </div>
         )}
 
         {/* New Akhrajat */}
@@ -613,7 +612,7 @@ export default function TransactionDetails({ transaction, onClose }) {
 
       {/* Trolly */}
       <div className="trolly-section">
-        <h4>ٹرولیاں</h4>
+        <h4>ٹرالی کی تفصیلات</h4>
         <div className="trolly-form">
           <div className="trolly-field">
             <label>ابتدائی نمبر:</label>
@@ -641,12 +640,12 @@ export default function TransactionDetails({ transaction, onClose }) {
           </div>
         </div>
         <button onClick={handleSaveTrolly} className="save-trolly-btn">
-          محفوظ کریں (صفحہ ریفریش ہوگا)
+          <span>✅</span> محفوظ کریں (صفحہ ریفریش ہوگا)
         </button>
       </div>
 
       <button onClick={onClose} className="close-btn">
-        بند کریں
+        <span>❌</span> بند کریں
       </button>
     </div>
   )
