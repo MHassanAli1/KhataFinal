@@ -1,9 +1,11 @@
 import { useEffect, useState, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 
 export default function MutafarikAkhrajatSummary() {
   const [akhrajat, setAkhrajat] = useState([]);
   const [titles, setTitles] = useState([]);
   const [loading, setLoading] = useState(true);
+  const navigate = useNavigate();
 
   // Fetch data
   useEffect(() => {
@@ -43,11 +45,45 @@ export default function MutafarikAkhrajatSummary() {
     return Object.values(grouped).reduce((sum, v) => sum + v, 0);
   }, [grouped]);
 
+  const handleReturn = () => {
+    navigate('/');
+  };
+
   if (loading) return <div>...لوڈ ہو رہا ہے</div>;
 
   return (
     <div className="mutafarik-summary">
       <h2>متفرق اخراجات کا خلاصہ</h2>
+      <button 
+        onClick={handleReturn}
+        style={{
+          padding: '8px 16px',
+          backgroundColor: '#007bff',
+          color: 'white',
+          border: 'none',
+          borderRadius: '4px',
+          cursor: 'pointer',
+          marginBottom: '15px',
+          fontWeight: 'bold'
+        }}
+      >
+        واپس جائیں
+      </button>
+      <button 
+        onClick={handleReturn}
+        style={{
+          padding: '8px 16px',
+          backgroundColor: '#007bff',
+          color: 'white',
+          border: 'none',
+          borderRadius: '4px',
+          cursor: 'pointer',
+          marginBottom: '15px',
+          fontWeight: 'bold'
+        }}
+      >
+        واپس جائیں
+      </button>
       {mutafarikAkhrajat.length === 0 ? (
         <p>کوئی متفرق اخراجات نہیں ملے</p>
       ) : (

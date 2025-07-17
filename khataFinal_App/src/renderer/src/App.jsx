@@ -23,7 +23,7 @@ function App() {
         <Route path="/TransactionSummary" element={<TransactionSummary />} />
         <Route path="/TrollySummaryold" element={<Trolly_Summary_old />} />
         <Route path="/GariSummary" element={<GariSummary />} />
-        <Route path="/MuktarifAkhrajatSummary" element={<MutafarikAkhrajatSummary />} />
+        <Route path="/MutafarikAkhrajatSummary" element={<MutafarikAkhrajatSummary />} />
       </Routes>
     </Router>
   )
