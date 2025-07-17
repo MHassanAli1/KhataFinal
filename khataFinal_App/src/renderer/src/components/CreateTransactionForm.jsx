@@ -239,6 +239,19 @@ export default function CreateTransactionForm() {
       setTotal('')
     }
   }, [starting, ending])
+  // Auto-calculate Saafi Amdan whenever Kul Amdan or Kul Akhrajat changes
+  useEffect(() => {
+    const amdan = parseFloat(kulAmdan) || 0
+    const akhrajat = parseFloat(kulAkhrajat) || 0
+    setSaafiAmdan(amdan - akhrajat)
+  }, [kulAmdan, kulAkhrajat])
+
+  // Auto-calculate Kul Maizan whenever Saafi Amdan or Exercise changes
+  useEffect(() => {
+    const saafi = parseFloat(saafiAmdan) || 0
+    const exc = parseFloat(exercise) || 0
+    setKulMaizan(saafi + exc)
+  }, [saafiAmdan, exercise])
 
   /* ==================================================================
    * Build <option> list for book select
@@ -720,9 +733,8 @@ export default function CreateTransactionForm() {
             type="number"
             placeholder="صافی آمدن"
             value={saafiAmdan ?? ``}
-            onChange={(e) => setSaafiAmdan(e.target.value)}
+            readOnly // 🔒 Auto-calculated
             dir="ltr"
-            onWheel={(e) => e.target.blur()}
           />
 
           <label htmlFor="exercise">ایکسایز:</label>
@@ -744,9 +756,8 @@ export default function CreateTransactionForm() {
             type="number"
             placeholder="کل میزان"
             value={kulMaizan ?? ``}
-            onChange={(e) => setKulMaizan(e.target.value)}
+            readOnly // 🔒 Auto-calculated
             dir="ltr"
-            onWheel={(e) => e.target.blur()}
           />
         </div>
 
