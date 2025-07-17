@@ -409,6 +409,10 @@ export default function GariSummary() {
 
       {/* No data message (after search) */}
       {!loading && data && data.rawCount === 0 && <p className="no-data-message">کوئی ریکارڈ نہیں ملا۔</p>}
+      
+      <div className="developer-mark">
+        <span className="developer-text">Made with ❤️ by Cache</span>
+      </div>
     </div>
   )
 }

@@ -232,6 +232,10 @@ export default function MutafarikAkhrajatSummary() {
           </div>
         </>
       )}
+      
+      <div className="developer-mark">
+        <span className="developer-text">Made with ❤️ by Cache</span>
+      </div>
     </div>
   )
 }

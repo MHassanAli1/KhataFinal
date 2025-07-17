@@ -769,6 +769,10 @@ function TransactionDashboard() {
       </div>
 
       <LogoutButton />
+      
+      <div className="developer-mark">
+        <span className="developer-text">Made with ❤️ by Cache</span>
+      </div>
     </div>
   )
 }

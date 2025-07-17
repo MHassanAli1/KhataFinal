@@ -386,3 +386,18 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* Developer mark */
+.developer-mark {
+  text-align: center;
+  margin-top: 30px;
+  padding: 10px;
+  font-size: 0.85rem;
+  color: #64748b;
+  border-top: 1px solid #e2e8f0;
+}
+
+.developer-text {
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  letter-spacing: 0.5px;
+}
