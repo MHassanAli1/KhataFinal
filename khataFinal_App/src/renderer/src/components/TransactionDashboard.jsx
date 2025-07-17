@@ -44,7 +44,7 @@ function TransactionDashboard() {
     } else {
       document.body.classList.remove('editing-active-body');
     }
-    
+
     // Clean up on unmount
     return () => {
       document.body.classList.remove('editing-active-body');
@@ -697,7 +697,7 @@ function TransactionDashboard() {
 
       {/* Urdu Keyboard */}
       {showKeyboard && <UrduKeyboard onKeyPress={handleKeyPress} onClose={closeKeyboard} />}
-      
+
       {/* Bottom Navigation Menu */}
       <div className="bottom-navigation">
         <div className="bottom-nav-section">
@@ -730,6 +730,20 @@ function TransactionDashboard() {
             >
               <span className="btn-icon">📈</span>
               <span className="btn-text">ریکارڈ کا خلاصہ</span>
+            </button>
+            <button
+              className="bottom-nav-btn primary"
+              onClick={() => handleNavigation('./GariSummary')}
+            >
+              <span className="btn-icon">🚗</span>
+              <span className="btn-text">Gari ka khulasa</span>
+            </button>
+            <button
+              className="bottom-nav-btn primary"
+              onClick={() => handleNavigation('./MutafarikAkhrajatSummary')}
+            >
+              <span className="btn-icon">⛩️</span>
+              <span className="btn-text">Mutafarik Akhrajat</span>
             </button>
           </div>
         </div>

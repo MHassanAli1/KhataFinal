@@ -1,15 +1,17 @@
 import { useState, useEffect, useMemo } from 'react'
 import './TransactionDetails.css'
 
+/* ------------------------------------------------------------------
+ * Constants
+ * ---------------------------------------------------------------- */
+const MUTAFARIK_LABEL = 'متفرق' // MUST match AkhrajatTitle.name in DB
+
 /**
  * TransactionDetails
  * ------------------------------------------------------------
- * - Always refetches a *full* transaction (with akhrajat.gariExpense[])
- *   so read-mode summaries show correct gari expense type.
- * - Supports prisma relation name `gariExpense` (singular) or legacy `gariExpenses`.
- * - Displays Gari expense *type* + (quantity|part) + amount in read mode.
- * - Provides dropdown of Gari Parts when type is Repairing/مرمت.
- * - Normalizes data on load & after create/update.
+ * - Refetches full transaction (akhrajat.gariExpense[], othersTitles).
+ * - Supports Gari + Mutafarik sub‑types (othersTitlesId).
+ * - Normalizes data on load/update.
  */
 export default function TransactionDetails({ transaction, onClose }) {
   /* --------------------------------------------------------------
@@ -22,9 +24,11 @@ export default function TransactionDetails({ transaction, onClose }) {
     if (['diesel', 'ڈیزل'].includes(v)) return 'diesel'
     if (['repairing', 'مرمت'].includes(v)) return 'repairing'
     if (['tuning', 'ٹیوننگ', 'ٹوننگ'].includes(v)) return 'tuning'
-    if (['parts', 'part', 'پرزہ', 'پارٹس'].includes(v)) return 'repairing' // treat "parts" as repairing
+    if (['parts', 'part', 'پرزہ', 'پارٹس'].includes(v)) return 'repairing'
     return v
   }
+
+  const isMutafarik = (title) => title === MUTAFARIK_LABEL
 
   /** Return gariExpense[] regardless of backend key shape. */
   const normalizeGariArray = (obj) => {
@@ -34,13 +38,20 @@ export default function TransactionDetails({ transaction, onClose }) {
     return []
   }
 
-  /** Build a normalized Akhrajat row with primary convenience object. */
+  /**
+   * Build a normalized Akhrajat row.
+   * Also lifts related othersTitles info into flat props:
+   *   othersTitlesId, otherTitle
+   */
   const normalizeAkhrajatItem = (a) => {
     const arr = normalizeGariArray(a)
+    const rel = a.othersTitles || null
     return {
       ...a,
-      gariExpenses: arr, // keep full array for outbound payloads
-      gariExpense: arr[0] || { title: '', quantity: '', part: '' } // primary for UI
+      gariExpenses: arr,
+      gariExpense: arr[0] || { title: '', quantity: '', part: '' },
+      othersTitlesId: a.othersTitlesId ?? rel?.id ?? null,
+      otherTitle: rel?.name ?? null
     }
   }
 
@@ -57,10 +68,10 @@ export default function TransactionDetails({ transaction, onClose }) {
   }
 
   /** Summary shown in read mode under the Gari field. */
-  const formatGariSummary = (ge, amt, displayLabel) => {
+  const formatGariSummary = (ge, _amt, displayLabel) => {
     if (!ge) return ''
     const slug = toSlug(ge.title)
-    const label = displayLabel(ge.title)
+    const label = displayGariLabel(ge.title)
     if (slug === 'petrol' || slug === 'diesel') {
       return `${label}${ge.quantity ? ` – مقدار: ${ge.quantity} لیٹر` : ''}`
     }
@@ -68,6 +79,15 @@ export default function TransactionDetails({ transaction, onClose }) {
       return `${label}${ge.part ? `: ${ge.part}` : ''}`
     }
     return `${label}`
+  }
+
+  /** Summary for Mutafarik row. */
+  const formatMutafarikSummary = (item, otherTitles) => {
+    const sub =
+      item.otherTitle ||
+      otherTitles.find((o) => o.id === item.othersTitlesId)?.name ||
+      ''
+    return `${MUTAFARIK_LABEL}${sub ? ` – ${sub}` : ''}`
   }
 
   /* --------------------------------------------------------------
@@ -78,16 +98,22 @@ export default function TransactionDetails({ transaction, onClose }) {
   const [total, setTotal] = useState(0)
   const [akhrajatList, setAkhrajatList] = useState([])
   const [editRows, setEditRows] = useState({})
-  const [newAkhrajat, setNewAkhrajat] = useState({ title: '', description: '', amount: '' })
+  const [newAkhrajat, setNewAkhrajat] = useState({
+    title: '',
+    description: '',
+    amount: '',
+    othersTitlesId: '' // for Mutafarik add
+  })
   const [akhrajatTitles, setAkhrajatTitles] = useState([]) // [{name,isGari}]
   const [formError, setFormError] = useState('')
   const [gariExpense, setGariExpense] = useState({ title: '', quantity: '', part: '' })
   const [gariExpenseTypes, setGariExpenseTypes] = useState([]) // [{name}] or [string]
   const [gariParts, setGariParts] = useState([]) // [{name}] or [string]
+  const [otherTitles, setOtherTitles] = useState([]) // [{id,name}]
   const [loadingFull, setLoadingFull] = useState(false)
 
   /* --------------------------------------------------------------
-   * Initial shallow load from prop (fast paint; may lack gariExpense)
+   * Initial shallow load from prop (fast paint; may lack relations)
    * ------------------------------------------------------------ */
   useEffect(() => {
     const trolly = transaction.trollies?.[0]
@@ -101,7 +127,7 @@ export default function TransactionDetails({ transaction, onClose }) {
   }, [transaction])
 
   /* --------------------------------------------------------------
-   * Guaranteed full fetch (ensures akhrajat.gariExpense[] present)
+   * Guaranteed full fetch (includes gariExpense + othersTitles)
    * ------------------------------------------------------------ */
   useEffect(() => {
     let active = true
@@ -109,7 +135,6 @@ export default function TransactionDetails({ transaction, onClose }) {
     if (!id) return
     setLoadingFull(true)
 
-    // Prefer modern handler; fallback to legacy if needed.
     const fetchFull =
       window.api?.transactions?.getById?.(id) ??
       window.api?.transaction?.getOne?.(id) ??
@@ -152,6 +177,9 @@ export default function TransactionDetails({ transaction, onClose }) {
     window.api?.admin?.gariParts?.getAll?.().then((parts) => {
       setGariParts(parts || [])
     })
+    window.api?.admin?.othersTitles?.getAll?.().then((ots) => {
+      setOtherTitles(ots || [])
+    })
   }, [])
 
   /* --------------------------------------------------------------
@@ -178,18 +206,20 @@ export default function TransactionDetails({ transaction, onClose }) {
     [akhrajatTitles, newAkhrajat.title]
   )
   const isGariSelected = !!selectedAkhrajatTitle?.isGari
+  const isMutafarikSelected = selectedAkhrajatTitle?.name === MUTAFARIK_LABEL
 
   /* --------------------------------------------------------------
    * Edit helpers
    * ------------------------------------------------------------ */
   const handleEditRowChange = (id, field, value) => {
-    setEditRows((prev) => ({
-      ...prev,
-      [id]: {
-        ...prev[id],
-        [field]: value
+    setEditRows((prev) => {
+      const base = { ...prev[id], [field]: value }
+      // if user changed title away from Mutafarik, clear othersTitlesId
+      if (field === 'title' && !isMutafarik(value)) {
+        delete base.othersTitlesId
       }
-    }))
+      return { ...prev, [id]: base }
+    })
   }
 
   const handleEditGariExpenseChange = (id, field, value) => {
@@ -221,6 +251,12 @@ export default function TransactionDetails({ transaction, onClose }) {
     return null
   }
 
+  const validateMutafarik = (isOther, subId) => {
+    if (!isOther) return null
+    if (!subId) return 'متفرق کی قسم منتخب کریں'
+    return null
+  }
+
   /* --------------------------------------------------------------
    * Save existing row
    * ------------------------------------------------------------ */
@@ -237,10 +273,18 @@ export default function TransactionDetails({ transaction, onClose }) {
 
     const selectedAkhrajatTitle = akhrajatTitles.find((t) => t.name === row.title)
     const isGari = selectedAkhrajatTitle?.isGari
+    const isOther = isMutafarik(row.title)
+
+    // validation
     const ge = row.gariExpense
-    const vErr = validateGari(isGari, ge)
-    if (vErr) {
-      setFormError(vErr)
+    const vG = validateGari(isGari, ge)
+    if (vG) {
+      setFormError(vG)
+      return
+    }
+    const vO = validateMutafarik(isOther, row.othersTitlesId)
+    if (vO) {
+      setFormError(vO)
       return
     }
 
@@ -251,8 +295,10 @@ export default function TransactionDetails({ transaction, onClose }) {
       description: row.description || '',
       date: transaction.date,
       isGari,
+      isOther,
       transactionId: transaction.id,
-      gariExpenses: isGari ? [ge] : []
+      gariExpenses: isGari ? [ge] : [],
+      othersTitlesId: isOther ? Number(row.othersTitlesId) || null : null
     }
 
     const updatedItem = await window.api.akhrajat.update(payload)
@@ -290,24 +336,35 @@ export default function TransactionDetails({ transaction, onClose }) {
 
     const selectedAkhrajatTitle = akhrajatTitles.find((t) => t.name === newAkhrajat.title)
     const isGari = selectedAkhrajatTitle?.isGari
+    const isOther = isMutafarik(newAkhrajat.title)
     const ge = gariExpense
-    const vErr = validateGari(isGari, ge)
-    if (vErr) {
-      setFormError(vErr)
+
+    const vG = validateGari(isGari, ge)
+    if (vG) {
+      setFormError(vG)
+      return
+    }
+    const vO = validateMutafarik(isOther, newAkhrajat.othersTitlesId)
+    if (vO) {
+      setFormError(vO)
       return
     }
 
     const created = await window.api.akhrajat.create({
-      ...newAkhrajat,
+      title: newAkhrajat.title,
+      description: newAkhrajat.description,
+      amount: Number(newAkhrajat.amount),
       transactionId: transaction.id,
       date: transaction.date,
       isGari,
-      gariExpenses: isGari ? [ge] : []
+      isOther,
+      gariExpenses: isGari ? [ge] : [],
+      othersTitlesId: isOther ? Number(newAkhrajat.othersTitlesId) || null : null
     })
 
     const normalizedCreated = normalizeAkhrajatItem(created)
     setAkhrajatList((prev) => [...prev, normalizedCreated])
-    setNewAkhrajat({ title: '', description: '', amount: '' })
+    setNewAkhrajat({ title: '', description: '', amount: '', othersTitlesId: '' })
     setGariExpense({ title: '', quantity: '', part: '' })
     setFormError('')
   }
@@ -339,6 +396,7 @@ export default function TransactionDetails({ transaction, onClose }) {
 
     const currentTitle = isEditing ? edit.title : item.title
     const isGari = akhrajatTitles.find((t) => t.name === currentTitle)?.isGari
+    const isOther = isMutafarik(currentTitle)
     const slugEditing = toSlug(isEditing ? edit.gariExpense?.title : primaryGE?.title)
 
     return (
@@ -363,6 +421,30 @@ export default function TransactionDetails({ transaction, onClose }) {
               <span>{item.title}</span>
             )}
           </div>
+
+          {/* Mutafarik Sub‑Title ------------------------------------ */}
+          {isOther && (
+            <div className="akhrajat-field">
+              <label>متفرق قسم:</label>
+              {isEditing ? (
+                <select
+                  value={edit.othersTitlesId || ''}
+                  onChange={(e) =>
+                    handleEditRowChange(item.id, 'othersTitlesId', e.target.value)
+                  }
+                >
+                  <option value="">متفرق کی قسم منتخب کریں</option>
+                  {otherTitles.map((ot) => (
+                    <option key={ot.id} value={ot.id}>
+                      {ot.name}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <span>{formatMutafarikSummary(item, otherTitles)}</span>
+              )}
+            </div>
+          )}
 
           {/* Gari Expense Type + Inline Summary ---------------------- */}
           {isGari && (
@@ -480,7 +562,11 @@ export default function TransactionDetails({ transaction, onClose }) {
                   const primaryGE = item.gariExpense || { title: '', quantity: '', part: '' }
                   setEditRows((prev) => ({
                     ...prev,
-                    [item.id]: { ...item, gariExpense: primaryGE }
+                    [item.id]: {
+                      ...item,
+                      gariExpense: primaryGE,
+                      othersTitlesId: item.othersTitlesId || ''
+                    }
                   }))
                 }}
               >
@@ -520,7 +606,16 @@ export default function TransactionDetails({ transaction, onClose }) {
             <label>عنوان:</label>
             <select
               value={newAkhrajat.title}
-              onChange={(e) => setNewAkhrajat({ ...newAkhrajat, title: e.target.value })}
+              onChange={(e) =>
+                setNewAkhrajat({
+                  ...newAkhrajat,
+                  title: e.target.value,
+                  // reset others / gari when switching type
+                  ...(e.target.value === MUTAFARIK_LABEL
+                    ? {}
+                    : { othersTitlesId: '' }),
+                })
+              }
             >
               <option value="">عنوان منتخب کریں</option>
               {akhrajatTitles.map((t) => (
@@ -531,6 +626,30 @@ export default function TransactionDetails({ transaction, onClose }) {
             </select>
           </div>
 
+          {/* Mutafarik sub‑type (new row) */}
+          {isMutafarikSelected && (
+            <div className="akhrajat-field">
+              <label>متفرق قسم:</label>
+              <select
+                value={newAkhrajat.othersTitlesId || ''}
+                onChange={(e) =>
+                  setNewAkhrajat({
+                    ...newAkhrajat,
+                    othersTitlesId: e.target.value
+                  })
+                }
+              >
+                <option value="">متفرق کی قسم منتخب کریں</option>
+                {otherTitles.map((ot) => (
+                  <option key={ot.id} value={ot.id}>
+                    {ot.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          {/* Gari sub‑form (new row) */}
           {isGariSelected && (
             <div className="gari-expense-box">
               <div className="akhrajat-field">
@@ -562,7 +681,9 @@ export default function TransactionDetails({ transaction, onClose }) {
                     type="number"
                     placeholder="مقدار (لیٹر)"
                     value={gariExpense.quantity}
-                    onChange={(e) => setGariExpense({ ...gariExpense, quantity: e.target.value })}
+                    onChange={(e) =>
+                      setGariExpense({ ...gariExpense, quantity: e.target.value })
+                    }
                   />
                 </div>
               )}
@@ -572,7 +693,9 @@ export default function TransactionDetails({ transaction, onClose }) {
                   <label>پرزہ:</label>
                   <select
                     value={gariExpense.part}
-                    onChange={(e) => setGariExpense({ ...gariExpense, part: e.target.value })}
+                    onChange={(e) =>
+                      setGariExpense({ ...gariExpense, part: e.target.value })
+                    }
                   >
                     <option value="">-- پرزہ منتخب کریں --</option>
                     {gariPartOptions.map((p) => (

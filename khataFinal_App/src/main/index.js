@@ -41,6 +41,7 @@ import transactionHandlers from './ipc/transaction.js'
 import akhrajatHandlers from './ipc/akhrajat.js'
 import trollyHandlers from './ipc/trolly.js'
 import registerTestHandlers from './ipc/test.js'
+import othersTitlesHandlers from './ipc/othersTitlesHandlers.js'
 import { registerAdminHandlers } from './ipc/admin.js'
 import syncHandlers from './ipc/sync.js'
 import { PrismaClient } from '@prisma/client'
@@ -171,6 +172,7 @@ app.whenReady().then(() => {
   registerTestHandlers(ipcMain)
   syncHandlers(ipcMain)
   registerAdminHandlers(ipcMain)
+  othersTitlesHandlers(ipcMain)
 
   app.on('activate', function () {
     // On macOS it's common to re-create a window in the app when the

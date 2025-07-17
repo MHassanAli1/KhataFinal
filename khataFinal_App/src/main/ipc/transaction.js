@@ -1,11 +1,36 @@
+// src/main/ipc/transactionHandlers.js
 import { PrismaClient } from '@prisma/client'
 const prisma = new PrismaClient()
 
 // اردو ویلیڈیشن
-const isUrdu = (text) => /^[\u0600-\u06FF\s]+$/.test(text)
+const isUrdu = (text) => /^[\u0600-\u06FF\s]+$/.test(text || '')
+
+const MAX_TICKETS_PER_BOOK = 100
+
+async function resolveOthersTitlesId(nameOrId) {
+  // if numeric id passed directly
+  if (typeof nameOrId === 'number' && !Number.isNaN(nameOrId)) {
+    const found = await prisma.othersTitles.findUnique({ where: { id: nameOrId } })
+    return found ? found.id : null
+  }
+  if (typeof nameOrId === 'string') {
+    const nm = nameOrId.trim()
+    if (!nm) return null
+    // try find
+    const found = await prisma.othersTitles.findUnique({ where: { name: nm } })
+    if (found) return found.id
+    // auto-create if not found
+    const created = await prisma.othersTitles.create({ data: { name: nm } })
+    return created.id
+  }
+  return null
+}
 
 const transactionHandlers = (ipcMain) => {
-  ipcMain.handle('transactions:create', async (event, data) => {
+  /* ===================================================================
+   * CREATE TRANSACTION
+   * ================================================================= */
+  ipcMain.handle('transactions:create', async (_event, data) => {
     try {
       const {
         userID,
@@ -22,25 +47,23 @@ const transactionHandlers = (ipcMain) => {
         total,
         bookNumber,
         akhrajat = []
-      } = data
+      } = data ?? {}
 
+      /* ---------------- Basic validation ---------------- */
       if (!isUrdu(ZoneName) || !isUrdu(KhdaName)) {
         throw new Error('زون اور کھدہ کا نام صرف اردو میں ہونا چاہیے۔')
       }
-
       if (!StartingNum || !EndingNum || !total) {
         throw new Error('ٹرالی کے نمبرز اور کل ٹرالیاں لازمی ہیں۔')
       }
-
       if (!bookNumber) {
         throw new Error('کتاب نمبر درج کریں۔')
       }
 
-      // چیک کریں یہ بک نمبر کسی اور کھدہ کے ساتھ تو نہیں لگا
+      /* ---------------- Enforce global book uniqueness ---------------- */
       const usedBook = await prisma.usedBookNumber.findUnique({
         where: { number: bookNumber }
       })
-
       if (usedBook) {
         if (usedBook.khdaName !== KhdaName) {
           throw new Error(
@@ -48,34 +71,136 @@ const transactionHandlers = (ipcMain) => {
           )
         }
       } else {
-        // نہیں استعمال ہوا، تو محفوظ کریں
         await prisma.usedBookNumber.create({
-          data: {
-            number: bookNumber,
-            khdaName: KhdaName
-          }
+          data: { number: bookNumber, khdaName: KhdaName }
         })
       }
 
-      // موجودہ ٹکٹ کی گنتی
+      /* ---------------- Ticket assignment ---------------- */
       const ticketCount = await prisma.transaction.count({
-        where: {
-          bookNumber,
-          KhdaName
-        }
+        where: { bookNumber, KhdaName }
       })
-
-      if (ticketCount >= 100) {
+      if (ticketCount >= MAX_TICKETS_PER_BOOK) {
         throw new Error(
-          `کتاب نمبر ${bookNumber} پر 100 ٹکٹ مکمل ہو چکے ہیں۔ نیا کتاب نمبر درج کریں۔`
+          `کتاب نمبر ${bookNumber} پر ${MAX_TICKETS_PER_BOOK} ٹکٹ مکمل ہو چکے ہیں۔ نیا کتاب نمبر درج کریں۔`
         )
       }
-
       const ticketNumber = ticketCount + 1
 
-      const validTitles = await prisma.akhrajatTitle.findMany()
-      const validTitleNames = validTitles.map((t) => t.name)
+      /* ---------------- Load AkhrajatTitle flags (gari) ---------------- */
+      const dbTitles = await prisma.akhrajatTitle.findMany({
+        select: { name: true, isGari: true } // schema you posted
+      })
+      const titleMap = new Map(dbTitles.map((t) => [t.name, t.isGari]))
 
+      /* ---------------- Build nested Akhrajat payload ---------------- */
+      const akhrajatCreateData = []
+
+      for (const a of akhrajat) {
+        if (!a?.title) continue // skip empty row
+        if (a.amount === undefined || a.amount === null || a.amount === '') continue
+
+        if (!titleMap.has(a.title)) {
+          throw new Error(`غلط اخراجات کا عنوان: ${a.title}`)
+        }
+
+        // Detect Mutafarik/Other (schema lacks isOther; infer)
+        const isOther = a.isOther === true || a.title ==="متفرق"
+
+        // For *non-other* rows, enforce Urdu description if provided
+        if (!isOther && a.description && !isUrdu(a.description)) {
+          throw new Error('اخراجات کی تفصیل صرف اردو میں درج کریں۔')
+        }
+
+        const isGari = titleMap.get(a.title) === true
+
+        const base = {
+          title: a.title,
+          // If "other", description is optional free text; keep if Urdu, else null
+          description: isOther
+            ? a.description && isUrdu(a.description)
+              ? a.description
+              : null
+            : a.description || null,
+          amount: BigInt(a.amount),
+          date: date ? new Date(date) : new Date(),
+          isGari,
+          isOther
+        }
+
+        /* ---------- Other (Mutafarik) branch ---------- */
+        if (isOther) {
+          // Try resolve OthersTitles via explicit id, otherTitle name, or description fallback
+          const candidate = a.othersTitlesId ?? a.otherTitle ?? a.description
+          const resolvedId = await resolveOthersTitlesId(candidate)
+          if (!resolvedId) {
+            throw new Error('متفرق اخراجات کے ذیلی عنوان کا انتخاب ضروری ہے۔')
+          }
+
+          akhrajatCreateData.push({
+            ...base,
+            othersTitles: { connect: { id: resolvedId } }
+          })
+          continue
+        }
+
+        /* ---------- Gari branch ---------- */
+        if (isGari) {
+          const items = Array.isArray(a.gariExpenses) ? a.gariExpenses : []
+          if (items.length === 0) {
+            throw new Error(`گاڑی اخراجات کی تفصیل: ${a.title} کے لیے ضروری ہے۔`)
+          }
+
+          const gariExpenseData = items.map((g) => {
+            if (!g?.title) throw new Error('گاڑی کا خرچ درکار ہے')
+
+            const t = g.title
+            const qtyRaw = g.quantity
+            const partRaw = g.part
+
+            // Validate known types
+            if (t === 'پٹرول' || t === 'ڈیزل') {
+              const q =
+                qtyRaw === '' || qtyRaw === null || qtyRaw === undefined ? null : Number(qtyRaw)
+              if (q === null || Number.isNaN(q) || q <= 0) {
+                throw new Error(`${t} کے لیے درست مقدار درکار ہے`)
+              }
+              return { title: t, quantity: q, part: null }
+            }
+
+            if (t === 'مرمت') {
+              const p = (partRaw ?? '').toString().trim()
+              if (!p) {
+                throw new Error('مرمت کے لیے پرزہ درکار ہے')
+              }
+              return { title: t, quantity: null, part: p }
+            }
+
+            // Other gari types: best effort
+            return {
+              title: t,
+              quantity:
+                qtyRaw === '' || qtyRaw == null
+                  ? null
+                  : Number.isNaN(Number(qtyRaw))
+                    ? null
+                    : Number(qtyRaw),
+              part: partRaw?.toString().trim() || null
+            }
+          })
+
+          akhrajatCreateData.push({
+            ...base,
+            gariExpense: { create: gariExpenseData }
+          })
+          continue
+        }
+
+        /* ---------- Plain (non-gari, non-other) ---------- */
+        akhrajatCreateData.push(base)
+      }
+
+      /* ---------------- Create Transaction ---------------- */
       const transaction = await prisma.transaction.create({
         data: {
           userID,
@@ -98,81 +223,17 @@ const transactionHandlers = (ipcMain) => {
               }
             ]
           },
-          akhrajat: {
-            create: await Promise.all(
-              akhrajat
-                .filter((a) => a.title && a.amount !== undefined && a.amount !== null)
-                .map(async (a) => {
-                  if (!validTitleNames.includes(a.title)) {
-                    throw new Error(`غلط اخراجات کا عنوان: ${a.title}`)
-                  }
-
-                  if (a.description && !isUrdu(a.description)) {
-                    throw new Error('اخراجات کی تفصیل صرف اردو میں درج کریں۔')
-                  }
-
-                  const base = {
-                    title: a.title,
-                    description: a.description || null,
-                    amount: BigInt(a.amount),
-                    date: date ? new Date(date) : new Date(),
-                    isGari: a.isGari || false,
-                    isOther: a.isOther || false
-                  }
-
-                  if (a.isGari) {
-                    const gariExpenseData = (a.gariExpenses || []).map((g) => {
-                      if (!g.title) throw new Error('گاڑی کا خرچ درکار ہے')
-
-                      const title = g.title
-                      const quantity = g.quantity !== '' ? Number(g.quantity) : null
-                      const part = g.part?.trim() || null
-
-                      if (
-                        ['پٹرول', 'ڈیزل'].includes(title) &&
-                        (quantity === null || isNaN(quantity))
-                      ) {
-                        throw new Error(`${title} کے لیے درست مقدار درکار ہے`)
-                      }
-
-                      if (title === 'مرمت' && !part) {
-                        throw new Error('مرمت کے لیے پرزہ درکار ہے')
-                      }
-
-                      return {
-                        title,
-                        quantity,
-                        part
-                      }
-                    })
-
-                    return {
-                      ...base,
-                      gariExpense: {
-                        create: gariExpenseData
-                      }
-                    }
-                  }
-
-                  return base
-                })
-            )
-          }
+          akhrajat: { create: akhrajatCreateData }
         },
         include: {
           trollies: true,
-          akhrajat: {
-            include: {
-              gariExpense: true
-            }
-          }
+          akhrajat: { include: { gariExpense: true, othersTitles: true } }
         }
       })
 
       console.log(
         `✅ معاملہ کامیابی سے بنایا گیا، بک نمبر: ${bookNumber}, ٹکٹ نمبر: ${ticketNumber}`
       )
-
       return transaction
     } catch (err) {
       console.error(`❌ معاملہ بنانے میں ناکامی: ${err.message}`)
@@ -180,6 +241,9 @@ const transactionHandlers = (ipcMain) => {
     }
   })
 
+  /* ===================================================================
+   * LAST ENDING NUM (trolly)
+   * ================================================================= */
   ipcMain.handle('transactions:getLastEndingNumber', async () => {
     const lastTrolly = await prisma.trolly.findFirst({
       orderBy: { EndingNum: 'desc' }
@@ -187,16 +251,15 @@ const transactionHandlers = (ipcMain) => {
     return lastTrolly?.EndingNum || 0n
   })
 
+  /* ===================================================================
+   * GET ALL
+   * ================================================================= */
   ipcMain.handle('transactions:getAll', async () => {
     try {
       return await prisma.transaction.findMany({
         include: {
           trollies: true,
-          akhrajat: {
-            include: {
-              gariExpense: true
-            }
-          }
+          akhrajat: { include: { gariExpense: true } }
         }
       })
     } catch (err) {
@@ -205,8 +268,10 @@ const transactionHandlers = (ipcMain) => {
     }
   })
 
-  // src/main/ipc/transactionHandlers.js (example – adjust your actual filename)
-  ipcMain.handle('transactions:getById', async (event, id) => {
+  /* ===================================================================
+   * GET BY ID
+   * ================================================================= */
+  ipcMain.handle('transactions:getById', async (_event, id) => {
     const txId = parseInt(id, 10)
     if (isNaN(txId)) throw new Error('Invalid transaction ID')
 
@@ -214,35 +279,32 @@ const transactionHandlers = (ipcMain) => {
       where: { id: txId },
       include: {
         trollies: true,
-        akhrajat: {
-          include: {
-            gariExpense: true // <-- CRITICAL
-          }
-        }
+        akhrajat: { include: { gariExpense: true } }
       }
     })
   })
 
-  ipcMain.handle('transactions:update', async (event, { id, ...data }) => {
+  /* ===================================================================
+   * UPDATE
+   *  (bookNumber NOT re-counting tickets; does minimal safety check)
+   * ================================================================= */
+  ipcMain.handle('transactions:update', async (_event, { id, ...data }) => {
     try {
-      const parsedId = parseInt(id)
+      const parsedId = parseInt(id, 10)
       if (isNaN(parsedId)) throw new Error('غلط شناخت')
 
       const { ZoneName, KhdaName, date, bookNumber } = data
 
-      // validate Urdu
       if (ZoneName && !isUrdu(ZoneName)) {
         throw new Error('زون کا نام صرف اردو میں ہونا چاہیے۔')
       }
-
       if (KhdaName && !isUrdu(KhdaName)) {
         throw new Error('کھدہ کا نام صرف اردو میں ہونا چاہیے۔')
       }
 
-      // optional bookNumber update
       let bookNumberToSet
       if (bookNumber) {
-        // check if this bookNumber is valid for the same khda
+        // Ensure book reserved for same khda
         const usedBook = await prisma.usedBookNumber.findUnique({
           where: { number: bookNumber }
         })
@@ -250,7 +312,6 @@ const transactionHandlers = (ipcMain) => {
         const existingTransaction = await prisma.transaction.findUnique({
           where: { id: parsedId }
         })
-
         if (!existingTransaction) {
           throw new Error('ٹرانزیکشن نہیں ملا۔')
         }
@@ -262,12 +323,9 @@ const transactionHandlers = (ipcMain) => {
             )
           }
         } else {
-          // first time use, register this book
+          // reserve it now
           await prisma.usedBookNumber.create({
-            data: {
-              number: bookNumber,
-              khdaName: existingTransaction.KhdaName
-            }
+            data: { number: bookNumber, khdaName: existingTransaction.KhdaName }
           })
         }
 
@@ -286,7 +344,7 @@ const transactionHandlers = (ipcMain) => {
           Exercise: data.Exercise ? BigInt(data.Exercise) : undefined,
           date: date ? new Date(date) : undefined,
           bookNumber: bookNumberToSet
-          // ticketNumber deliberately never changed
+          // ticketNumber deliberately unchanged
         }
       })
 
@@ -298,9 +356,12 @@ const transactionHandlers = (ipcMain) => {
     }
   })
 
-  ipcMain.handle('transactions:delete', async (event, id) => {
+  /* ===================================================================
+   * DELETE (single)
+   * ================================================================= */
+  ipcMain.handle('transactions:delete', async (_event, id) => {
     try {
-      const parsedId = parseInt(id)
+      const parsedId = parseInt(id, 10)
       if (isNaN(parsedId)) throw new Error('Invalid ID')
 
       const transaction = await prisma.transaction.findUnique({
@@ -308,14 +369,10 @@ const transactionHandlers = (ipcMain) => {
       })
       if (!transaction) throw new Error('Transaction not found')
 
-      // ➡️ store in DeletedTransaction
       await prisma.deletedTransaction.create({
-        data: {
-          transactionId: parsedId
-        }
+        data: { transactionId: parsedId }
       })
 
-      // continue deleting as before
       await prisma.akhrajat.deleteMany({ where: { transactionId: parsedId } })
       await prisma.trolly.deleteMany({ where: { transactionId: parsedId } })
       await prisma.transaction.delete({ where: { id: parsedId } })
@@ -327,18 +384,16 @@ const transactionHandlers = (ipcMain) => {
     }
   })
 
-  ipcMain.handle('transactions:deleteBookByNumber', async (event, bookNumber) => {
+  /* ===================================================================
+   * DELETE ALL BY BOOK NUMBER
+   * ================================================================= */
+  ipcMain.handle('transactions:deleteBookByNumber', async (_event, bookNumber) => {
     try {
-      const transactions = await prisma.transaction.findMany({
-        where: { bookNumber }
-      })
+      const transactions = await prisma.transaction.findMany({ where: { bookNumber } })
       const idsToDelete = transactions.map((t) => t.id)
 
-      // store in DeletedTransaction
       for (const tid of idsToDelete) {
-        await prisma.deletedTransaction.create({
-          data: { transactionId: tid }
-        })
+        await prisma.deletedTransaction.create({ data: { transactionId: tid } })
       }
 
       await prisma.akhrajat.deleteMany({ where: { transactionId: { in: idsToDelete } } })
@@ -353,9 +408,12 @@ const transactionHandlers = (ipcMain) => {
     }
   })
 
-  ipcMain.handle('transactions:deleteFromTicket', async (event, id) => {
+  /* ===================================================================
+   * DELETE FROM TICKET (cascade forward)
+   * ================================================================= */
+  ipcMain.handle('transactions:deleteFromTicket', async (_event, id) => {
     try {
-      const parsedId = parseInt(id)
+      const parsedId = parseInt(id, 10)
       if (isNaN(parsedId)) throw new Error('Invalid ID')
 
       const transaction = await prisma.transaction.findUnique({ where: { id: parsedId } })
@@ -364,18 +422,12 @@ const transactionHandlers = (ipcMain) => {
       const { bookNumber, ticketNumber } = transaction
 
       const toDelete = await prisma.transaction.findMany({
-        where: {
-          bookNumber,
-          ticketNumber: { gte: ticketNumber }
-        }
+        where: { bookNumber, ticketNumber: { gte: ticketNumber } }
       })
       const idsToDelete = toDelete.map((t) => t.id)
 
-      // store in DeletedTransaction
       for (const tid of idsToDelete) {
-        await prisma.deletedTransaction.create({
-          data: { transactionId: tid }
-        })
+        await prisma.deletedTransaction.create({ data: { transactionId: tid } })
       }
 
       await prisma.akhrajat.deleteMany({ where: { transactionId: { in: idsToDelete } } })
@@ -385,11 +437,14 @@ const transactionHandlers = (ipcMain) => {
       return { message: `ٹکٹ نمبر ${ticketNumber} سے تمام حذف کر دیے گئے۔` }
     } catch (err) {
       console.error('Delete From Ticket Error:', err)
-      throw new Error(err.message || 'Failed to delete from ticket')
+      throw new Error('Failed to delete from ticket')
     }
   })
 
-  ipcMain.handle('transactions:search', async (event, query) => {
+  /* ===================================================================
+   * SEARCH
+   * ================================================================= */
+  ipcMain.handle('transactions:search', async (_event, query) => {
     try {
       if (!query || typeof query !== 'string') throw new Error('Invalid search input')
 
@@ -402,11 +457,7 @@ const transactionHandlers = (ipcMain) => {
         },
         include: {
           trollies: true,
-          akhrajat: {
-            include: {
-              gariExpense: true
-            }
-          }
+          akhrajat: { include: { gariExpense: true } }
         }
       })
     } catch (err) {
@@ -415,17 +466,16 @@ const transactionHandlers = (ipcMain) => {
     }
   })
 
-  ipcMain.handle('transaction:getOne', async (event, id) => {
+  /* ===================================================================
+   * LEGACY GET ONE
+   * ================================================================= */
+  ipcMain.handle('transaction:getOne', async (_event, id) => {
     try {
       const transaction = await prisma.transaction.findUnique({
         where: { id },
         include: {
           trollies: true,
-          akhrajat: {
-            include: {
-              gariExpense: true
-            }
-          }
+          akhrajat: { include: { gariExpense: true } }
         }
       })
       return transaction
@@ -435,40 +485,163 @@ const transactionHandlers = (ipcMain) => {
     }
   })
 
-  ipcMain.handle('transactions:getLatestByKhda', async (event, khdaName) => {
+  /* ===================================================================
+   * GET ALL BOOKS FOR A KHDA
+   *  - returns registered books + usage
+   *  - includes legacy books found in transactions but not registered
+   * ================================================================= */
+  ipcMain.handle('transactions:getBooksByKhda', async (_event, khdaName) => {
     try {
-      // get the latest transaction for this khda
+      if (!khdaName) return []
+
+      // Registered books
+      const registered = await prisma.usedBookNumber.findMany({
+        where: { khdaName: khdaName },
+        select: { number: true }
+      })
+
+      // Usage counts from transactions
+      const grouped = await prisma.transaction.groupBy({
+        by: ['bookNumber'],
+        where: { KhdaName: khdaName },
+        _count: { _all: true },
+        _max: { createdAt: true }
+      })
+
+      const countMap = new Map()
+      grouped.forEach((g) => {
+        countMap.set(g.bookNumber, {
+          ticketsUsed: g._count._all,
+          lastTxDate: g._max.createdAt
+        })
+      })
+
+      const books = []
+
+      // include all registered
+      for (const r of registered) {
+        const info = countMap.get(r.number)
+        const used = info?.ticketsUsed ?? 0
+        books.push({
+          bookNumber: r.number,
+          ticketsUsed: used,
+          ticketsRemaining: Math.max(0, MAX_TICKETS_PER_BOOK - used),
+          nextTicket: used >= MAX_TICKETS_PER_BOOK ? MAX_TICKETS_PER_BOOK : used + 1,
+          isFull: used >= MAX_TICKETS_PER_BOOK,
+          lastTxDate: info?.lastTxDate ?? null
+        })
+      }
+
+      // include any *unregistered* legacy bookNumbers that have transactions
+      for (const [num, info] of countMap.entries()) {
+        if (!books.some((b) => b.bookNumber === num)) {
+          const used = info.ticketsUsed
+          books.push({
+            bookNumber: num,
+            ticketsUsed: used,
+            ticketsRemaining: Math.max(0, MAX_TICKETS_PER_BOOK - used),
+            nextTicket: used >= MAX_TICKETS_PER_BOOK ? MAX_TICKETS_PER_BOOK : used + 1,
+            isFull: used >= MAX_TICKETS_PER_BOOK,
+            lastTxDate: info.lastTxDate ?? null
+          })
+        }
+      }
+
+      // sort: non-full first, then latest use desc, then numeric/alpha
+      books.sort((a, b) => {
+        if (a.isFull !== b.isFull) return a.isFull ? 1 : -1
+        if (a.lastTxDate && b.lastTxDate) {
+          const da = new Date(a.lastTxDate).getTime()
+          const db = new Date(b.lastTxDate).getTime()
+          if (da !== db) return db - da
+        }
+        return a.bookNumber.localeCompare(b.bookNumber, undefined, { numeric: true })
+      })
+
+      return books
+    } catch (err) {
+      console.error('transactions:getBooksByKhda Error:', err)
+      throw new Error('کتابوں کی فہرست لوڈ کرنے میں ناکامی')
+    }
+  })
+
+  /* ===================================================================
+   * REGISTER A NEW BOOK FOR A KHDA (explicit activate)
+   * ================================================================= */
+  ipcMain.handle('transactions:registerBook', async (_event, { khdaName, bookNumber }) => {
+    try {
+      if (!khdaName || !bookNumber) {
+        throw new Error('کتاب نمبر اور کھدہ دونوں درکار ہیں۔')
+      }
+
+      const existing = await prisma.usedBookNumber.findUnique({
+        where: { number: bookNumber }
+      })
+
+      if (existing) {
+        if (existing.khdaName !== khdaName) {
+          throw new Error(
+            `کتاب نمبر ${bookNumber} پہلے سے ${existing.khdaName} کے لیے استعمال ہو چکا ہے۔`
+          )
+        }
+        // already registered for same khda -> return usage summary
+      } else {
+        await prisma.usedBookNumber.create({
+          data: { number: bookNumber, khdaName }
+        })
+      }
+
+      // return fresh metadata
+      const books = await prisma.transaction.groupBy({
+        by: ['bookNumber'],
+        where: { KhdaName: khdaName, bookNumber },
+        _count: { _all: true }
+      })
+
+      const used = books[0]?._count?._all ?? 0
+      return {
+        bookNumber,
+        khdaName,
+        ticketsUsed: used,
+        ticketsRemaining: Math.max(0, MAX_TICKETS_PER_BOOK - used),
+        nextTicket: used >= MAX_TICKETS_PER_BOOK ? MAX_TICKETS_PER_BOOK : used + 1,
+        isFull: used >= MAX_TICKETS_PER_BOOK
+      }
+    } catch (err) {
+      console.error('transactions:registerBook Error:', err)
+      throw new Error('کتاب نمبر رجسٹر کرنے میں ناکامی')
+    }
+  })
+
+  /* ===================================================================
+   * LATEST ACTIVE BOOK (legacy helper, 1 book)
+   * Returns: last used ticketNumber (renderer adds +1)
+   * ================================================================= */
+  ipcMain.handle('transactions:getLatestByKhda', async (_event, khdaName) => {
+    try {
+      if (!khdaName) return null
+
       const latest = await prisma.transaction.findFirst({
         where: { KhdaName: khdaName },
         orderBy: { createdAt: 'desc' },
-        select: {
-          bookNumber: true,
-          ticketNumber: true
-        }
+        select: { bookNumber: true, ticketNumber: true }
       })
 
-      if (!latest || !latest.bookNumber) {
-        // no transaction yet
-        return null
-      }
+      if (!latest) return null
+      if (latest.ticketNumber >= MAX_TICKETS_PER_BOOK) return null
 
-      if (latest.ticketNumber < 100) {
-        // current book still has tickets available
-        return {
-          bookNumber: latest.bookNumber,
-          ticketNumber: latest.ticketNumber
-        }
-      } else {
-        // book is full
-        return null
-      }
+      // Return last ticket used; renderer will add +1
+      return latest
     } catch (err) {
-      console.error('getActiveBookByKhda Error:', err)
+      console.error('transactions:getLatestByKhda Error:', err)
       throw new Error('کھدہ کے لیے فعال کتاب حاصل کرنے میں ناکامی')
     }
   })
 
-  ipcMain.handle('transactions:markSynced', async (event, { id, syncedAt }) => {
+  /* ===================================================================
+   * SYNC MARK
+   * ================================================================= */
+  ipcMain.handle('transactions:markSynced', async (_event, { id, syncedAt }) => {
     return await prisma.transaction.update({
       where: { id },
       data: {
@@ -477,10 +650,15 @@ const transactionHandlers = (ipcMain) => {
       }
     })
   })
+
+  /* ===================================================================
+   * DELETED BUFFER
+   * ================================================================= */
   ipcMain.handle('transactions:getDeleted', async () => {
     return await prisma.deletedTransaction.findMany()
   })
-  ipcMain.handle('transactions:clearDeleted', async (event, ids) => {
+
+  ipcMain.handle('transactions:clearDeleted', async (_event, ids) => {
     try {
       await prisma.deletedTransaction.deleteMany({
         where: { transactionId: { in: ids } }

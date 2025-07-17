@@ -7,6 +7,8 @@ import AkhrajatSummary from './components/AkhrajatSummary.jsx'
 import TrollySummary from './components/TrollySummary.jsx'
 import TransactionSummary from './components/TransactionSummary.jsx'
 import Trolly_Summary_old from './components/Trolly_summary_old.jsx'
+import GariSummary from './components/GariSummary.jsx'
+import MutafarikAkhrajatSummary from './components/MutafarikAkhrajatSummary.jsx'
 
 function App() {
   return (
@@ -19,7 +21,9 @@ function App() {
         <Route path="/AkhrajatSummary" element={<AkhrajatSummary />} />
         <Route path="/TrollySummary" element={<TrollySummary />} />
         <Route path="/TransactionSummary" element={<TransactionSummary />} />
-         <Route path="/TrollySummaryold" element={<Trolly_Summary_old />} />
+        <Route path="/TrollySummaryold" element={<Trolly_Summary_old />} />
+        <Route path="/GariSummary" element={<GariSummary />} />
+        <Route path="/MuktarifAkhrajatSummary" element={<MutafarikAkhrajatSummary />} />
       </Routes>
     </Router>
   )

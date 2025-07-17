@@ -22,17 +22,29 @@ const api = {
       ipcRenderer.invoke('transactions:deleteBookByNumber', bookNumber),
     deleteFromTicket: (id) => ipcRenderer.invoke('transactions:deleteFromTicket', id),
     search: (query) => ipcRenderer.invoke('transactions:search', query),
-    getOne: (id) => ipcRenderer.invoke('transaction:getOne', id),
+    getOne: (id) => ipcRenderer.invoke('transaction:getOne', id), // legacy alias
     getLatestByKhda: (khdaName) => ipcRenderer.invoke('transactions:getLatestByKhda', khdaName),
+
+    /* mark as synced */
     markSynced: (data) => ipcRenderer.invoke('transactions:markSynced', data),
+
+    /* deleted buffer */
     getDeleted: () => ipcRenderer.invoke('transactions:getDeleted'),
-    clearDeleted: (ids) => ipcRenderer.invoke('transactions:clearDeleted', ids)
+    clearDeleted: (ids) => ipcRenderer.invoke('transactions:clearDeleted', ids),
+
+    /* list all/active books for a khda (rich metadata) */
+    getBooksByKhda: (khdaName) => ipcRenderer.invoke('transactions:getBooksByKhda', khdaName),
+
+    /* NEW: explicitly register/activate a book for a khda (no ticket yet) */
+    registerBook: (khdaName, bookNumber) =>
+      ipcRenderer.invoke('transactions:registerBook', { khdaName, bookNumber })
   },
   akhrajat: {
     create: (data) => ipcRenderer.invoke('akhrajat:create', data),
     update: (data) => ipcRenderer.invoke('akhrajat:update', data),
     delete: (id) => ipcRenderer.invoke('akhrajat:delete', id),
-    getAll: (...args) => ipcRenderer.invoke('akhrajat:getAll', ...args)
+    getAll: (...args) => ipcRenderer.invoke('akhrajat:getAll', ...args),
+    gariSummary: (params) => ipcRenderer.invoke('akhrajat:gariSummary', params)
   },
   trollies: {
     update: (data) => ipcRenderer.invoke('trollies:update', data),
@@ -51,6 +63,12 @@ const api = {
       create: (name) => ipcRenderer.invoke('zones:create', name),
       delete: (id) => ipcRenderer.invoke('zones:delete', id),
       update: (data) => ipcRenderer.invoke('zones:update', data)
+    },
+    othersTitles: {
+      getAll: () => ipcRenderer.invoke('othersTitles:getAll'),
+      create: (name) => ipcRenderer.invoke('othersTitles:create', name),
+      update: (data) => ipcRenderer.invoke('othersTitles:update', data), // {id,name}
+      delete: (id) => ipcRenderer.invoke('othersTitles:delete', id)
     },
     khdas: {
       getAllkhdas: () => ipcRenderer.invoke('khdas:getAllkhdas'),

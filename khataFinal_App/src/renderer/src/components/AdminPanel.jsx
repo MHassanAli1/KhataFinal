@@ -6,17 +6,41 @@ import { useNavigate } from 'react-router-dom'
 import { LogoutButton } from './logout'
 import UrduKeyboard from './UrduKeyboard'
 
+/** Change this if your Mutafarik display text differs. */
+const MUTAFARIK_LABEL = 'متفرق' // must match AkhrajatTitle.name in DB
+
 export default function AdminPanel() {
-  const [zones, setZones] = useState([])
-  const [titles, setTitles] = useState([])
+  const navigate = useNavigate()
+
+  /* ========================= Core Admin Lists ========================= */
+  const [zones, setZones] = useState([]) // [{id,name,khdas:[{id,name,zoneId},...]},...]
+  const [titles, setTitles] = useState([]) // Akhrajat titles (non-car + car + mutafarik)
+  const [gariTitles, setGariTitles] = useState([])
+  const [gariExpenseTypes, setGariExpenseTypes] = useState([])
+  const [gariParts, setGariParts] = useState([])
+  const [othersTitles, setOthersTitles] = useState([]) // NEW
+
+  /* ========================= Keyboard State ========================= */
   const [showKeyboard, setShowKeyboard] = useState(false)
   const [activeInput, setActiveInput] = useState(null)
 
+  /* ========================= Zone / Khda Create ========================= */
   const [newZone, setNewZone] = useState('')
   const [newKhda, setNewKhda] = useState('')
   const [selectedZoneForKhda, setSelectedZoneForKhda] = useState('')
+
+  /* ========================= Akhrajat Title Create ========================= */
   const [newTitle, setNewTitle] = useState('')
 
+  /* ========================= Gari Admin Create ========================= */
+  const [newGariTitle, setNewGariTitle] = useState('')
+  const [newExpenseType, setNewExpenseType] = useState('')
+  const [newGariPart, setNewGariPart] = useState('')
+
+  /* ========================= OthersTitles Create ========================= */
+  const [newOtherTitle, setNewOtherTitle] = useState('') // NEW
+
+  /* ========================= Editing State ========================= */
   const [editingZone, setEditingZone] = useState(null)
   const [editingZoneName, setEditingZoneName] = useState('')
 
@@ -27,30 +51,21 @@ export default function AdminPanel() {
   const [editingTitle, setEditingTitle] = useState(null)
   const [editingTitleName, setEditingTitleName] = useState('')
 
-  const [gariTitles, setGariTitles] = useState([])
-  const [gariExpenseTypes, setGariExpenseTypes] = useState([])
-  const [gariParts, setGariParts] = useState([])
-
-  // Gari Titles
-  const [newGariTitle, setNewGariTitle] = useState('')
   const [editingGariTitle, setEditingGariTitle] = useState(null)
   const [editingGariTitleName, setEditingGariTitleName] = useState('')
 
-  // Gari Expense Types
-  const [newExpenseType, setNewExpenseType] = useState('')
   const [editingExpenseType, setEditingExpenseType] = useState(null)
   const [editingExpenseTypeName, setEditingExpenseTypeName] = useState('')
 
-  // Gari Parts
-  const [newGariPart, setNewGariPart] = useState('')
   const [editingGariPart, setEditingGariPart] = useState(null)
   const [editingGariPartName, setEditingGariPartName] = useState('')
 
-  const navigate = useNavigate()
+  const [editingOtherTitle, setEditingOtherTitle] = useState(null) // NEW
+  const [editingOtherTitleName, setEditingOtherTitleName] = useState('') // NEW
 
-  // Handle keyboard functionality
-
-  // helper to update active input state consistently
+  /* ===================================================================
+   * Keyboard Helpers
+   * ================================================================= */
   const updateActiveInput = (updater) => {
     switch (activeInput) {
       case 'newZone':
@@ -71,6 +86,9 @@ export default function AdminPanel() {
       case 'newGariPart':
         setNewGariPart(updater(newGariPart))
         break
+      case 'newOtherTitle': // NEW
+        setNewOtherTitle(updater(newOtherTitle))
+        break
       default:
         if (activeInput?.startsWith('editZone-')) {
           setEditingZoneName(updater(editingZoneName))
@@ -78,6 +96,14 @@ export default function AdminPanel() {
           setEditingKhdaName(updater(editingKhdaName))
         } else if (activeInput?.startsWith('editTitle-')) {
           setEditingTitleName(updater(editingTitleName))
+        } else if (activeInput?.startsWith('editGariTitle-')) {
+          setEditingGariTitleName(updater(editingGariTitleName))
+        } else if (activeInput?.startsWith('editExpenseType-')) {
+          setEditingExpenseTypeName(updater(editingExpenseTypeName))
+        } else if (activeInput?.startsWith('editGariPart-')) {
+          setEditingGariPartName(updater(editingGariPartName))
+        } else if (activeInput?.startsWith('editOtherTitle-')) {
+          setEditingOtherTitleName(updater(editingOtherTitleName))
         }
         break
     }
@@ -85,7 +111,6 @@ export default function AdminPanel() {
 
   const handleKeyPress = (char) => {
     if (!activeInput) return
-
     if (char === 'backspace') {
       updateActiveInput((prev) => prev.slice(0, -1))
     } else {
@@ -100,14 +125,19 @@ export default function AdminPanel() {
 
   const handleFocus = (e) => {
     setActiveInput(e.target.id)
-    setShowKeyboard(true) // Automatically show keyboard when input is focused
+    setShowKeyboard(true)
   }
 
+  /* ===================================================================
+   * Load All Admin Data
+   * ================================================================= */
   const loadData = async () => {
     const z = await window.api.admin.zones.getAll()
     setZones(z)
+
     const t = await window.api.admin.akhrajatTitles.getAll()
     setTitles(t)
+
     const gt = await window.api.admin.gariTitles.getAll()
     setGariTitles(gt)
 
@@ -116,13 +146,18 @@ export default function AdminPanel() {
 
     const gp = await window.api.admin.gariParts.getAll()
     setGariParts(gp)
+
+    const ot = await window.api.admin.othersTitles.getAll() // NEW
+    setOthersTitles(ot)
   }
 
   useEffect(() => {
     loadData()
   }, [])
 
-  // Zones
+  /* ===================================================================
+   * Zones CRUD
+   * ================================================================= */
   const addZone = async () => {
     if (newZone.trim()) {
       await window.api.admin.zones.create(newZone.trim())
@@ -148,7 +183,9 @@ export default function AdminPanel() {
     loadData()
   }
 
-  // Khdas
+  /* ===================================================================
+   * Khda CRUD
+   * ================================================================= */
   const addKhda = async () => {
     if (newKhda.trim() && selectedZoneForKhda) {
       await window.api.admin.khdas.create({
@@ -180,7 +217,9 @@ export default function AdminPanel() {
     loadData()
   }
 
-  // Titles
+  /* ===================================================================
+   * Akhrajat Title CRUD
+   * ================================================================= */
   const addTitle = async () => {
     if (newTitle.trim()) {
       await window.api.admin.akhrajatTitles.create(newTitle.trim())
@@ -206,15 +245,85 @@ export default function AdminPanel() {
     loadData()
   }
 
+  /* ===================================================================
+   * Gari Titles CRUD
+   * ================================================================= */
+  const saveGariTitleEdit = async (gariId) => {
+    await window.api.admin.gariTitles.update({
+      id: gariId,
+      name: editingGariTitleName
+    })
+    setEditingGariTitle(null)
+    setEditingGariTitleName('')
+    loadData()
+  }
+
+  /* ===================================================================
+   * Gari Expense Types CRUD
+   * ================================================================= */
+  const saveExpenseTypeEdit = async (id) => {
+    await window.api.admin.gariExpenseTypes.update({
+      id,
+      name: editingExpenseTypeName
+    })
+    setEditingExpenseType(null)
+    setEditingExpenseTypeName('')
+    loadData()
+  }
+
+  /* ===================================================================
+   * Gari Parts CRUD
+   * ================================================================= */
+  const saveGariPartEdit = async (id) => {
+    await window.api.admin.gariParts.update({
+      id,
+      name: editingGariPartName
+    })
+    setEditingGariPart(null)
+    setEditingGariPartName('')
+    loadData()
+  }
+
+  /* ===================================================================
+   * OthersTitles CRUD (NEW)
+   * ================================================================= */
+  const addOtherTitle = async () => {
+    if (newOtherTitle.trim()) {
+      await window.api.admin.othersTitles.create(newOtherTitle.trim())
+      setNewOtherTitle('')
+      loadData()
+    }
+  }
+
+  const updateOtherTitle = async () => {
+    if (editingOtherTitle && editingOtherTitleName.trim()) {
+      await window.api.admin.othersTitles.update({
+        id: editingOtherTitle,
+        name: editingOtherTitleName.trim()
+      })
+      setEditingOtherTitle(null)
+      setEditingOtherTitleName('')
+      loadData()
+    }
+  }
+
+  const deleteOtherTitle = async (id) => {
+    await window.api.admin.othersTitles.delete(id)
+    loadData()
+  }
+
+  /* ===================================================================
+   * Render
+   * ================================================================= */
   return (
     <div className="container">
       <button type="button" className="return-btn" onClick={() => navigate('/')}>
         ⬅️ واپس جائیں
       </button>
 
-      {/* Zones with khdas */}
-
-      {/* Zones with khdas */}
+      {/* ================================================================
+       * Zones + Khda tree
+       * ============================================================== */}
       <div className="section">
         <h2 className="section-title">زون اور کھدے</h2>
         {zones.map((zone) => (
@@ -255,6 +364,7 @@ export default function AdminPanel() {
                 </div>
               </div>
             )}
+
             <ul className="khda-list">
               {zone.khdas.map((khda) =>
                 editingKhda === khda.id ? (
@@ -373,8 +483,9 @@ export default function AdminPanel() {
       <div className="section">
         <h2 className="section-title">اخراجات کے عنوانات</h2>
         <ul className="title-list">
-          {titles.map((title) =>
-            editingTitle === title.id ? (
+          {titles.map((title) => {
+            const isMutafarik = title.name === MUTAFARIK_LABEL
+            return editingTitle === title.id ? (
               <div key={title.id} className="flex-container">
                 <input
                   type="text"
@@ -393,10 +504,14 @@ export default function AdminPanel() {
               </div>
             ) : (
               <li key={title.id} className="title-item">
-                {title.name}
-                {title.isGari ? (
+                <span>{title.name}</span>
+                {title.isGari && (
                   <strong style={{ color: 'green', marginRight: '1rem' }}>گاڑی</strong>
-                ) : (
+                )}
+                {isMutafarik && (
+                  <strong style={{ color: 'blue', marginRight: '1rem' }}>متفرق</strong>
+                )}
+                {!title.isGari && !isMutafarik && (
                   <div className="button-group">
                     <button
                       onClick={() => {
@@ -414,7 +529,7 @@ export default function AdminPanel() {
                 )}
               </li>
             )
-          )}
+          })}
         </ul>
       </div>
 
@@ -441,6 +556,7 @@ export default function AdminPanel() {
         </form>
       </div>
 
+      {/* Gari Titles */}
       <div className="section">
         <h2 className="section-title">گاڑیوں کے نام</h2>
         <ul className="title-list">
@@ -455,18 +571,7 @@ export default function AdminPanel() {
                   id={`editGariTitle-${gari.id}`}
                   className="input-text"
                 />
-                <button
-                  onClick={async () => {
-                    await window.api.admin.gariTitles.update({
-                      id: gari.id,
-                      name: editingGariTitleName
-                    })
-                    setEditingGariTitle(null)
-                    setEditingGariTitleName('')
-                    loadData()
-                  }}
-                  className="button-save"
-                >
+                <button onClick={() => saveGariTitleEdit(gari.id)} className="button-save">
                   محفوظ کریں
                 </button>
                 <button onClick={() => setEditingGariTitle(null)} className="button-cancel">
@@ -525,6 +630,7 @@ export default function AdminPanel() {
         </form>
       </div>
 
+      {/* Gari Expense Types */}
       <div className="section">
         <h2 className="section-title">گاڑی اخراجات کی اقسام</h2>
         <ul className="title-list">
@@ -539,18 +645,7 @@ export default function AdminPanel() {
                   id={`editExpenseType-${et.id}`}
                   className="input-text"
                 />
-                <button
-                  onClick={async () => {
-                    await window.api.admin.gariExpenseTypes.update({
-                      id: et.id,
-                      name: editingExpenseTypeName
-                    })
-                    setEditingExpenseType(null)
-                    setEditingExpenseTypeName('')
-                    loadData()
-                  }}
-                  className="button-save"
-                >
+                <button onClick={() => saveExpenseTypeEdit(et.id)} className="button-save">
                   محفوظ کریں
                 </button>
                 <button onClick={() => setEditingExpenseType(null)} className="button-cancel">
@@ -609,6 +704,7 @@ export default function AdminPanel() {
         </form>
       </div>
 
+      {/* Gari Parts */}
       <div className="section">
         <h2 className="section-title">گاڑی کے پرزے</h2>
         <ul className="title-list">
@@ -623,18 +719,7 @@ export default function AdminPanel() {
                   id={`editGariPart-${part.id}`}
                   className="input-text"
                 />
-                <button
-                  onClick={async () => {
-                    await window.api.admin.gariParts.update({
-                      id: part.id,
-                      name: editingGariPartName
-                    })
-                    setEditingGariPart(null)
-                    setEditingGariPartName('')
-                    loadData()
-                  }}
-                  className="button-save"
-                >
+                <button onClick={() => saveGariPartEdit(part.id)} className="button-save">
                   محفوظ کریں
                 </button>
                 <button onClick={() => setEditingGariPart(null)} className="button-cancel">
@@ -693,7 +778,75 @@ export default function AdminPanel() {
         </form>
       </div>
 
-      {/* Keyboard toggle button */}
+      {/* ================================================================
+       * OthersTitles (متفرق کے ذیلی عنوانات)
+       * ============================================================== */}
+      <div className="section">
+        <h2 className="section-title">متفرق اخراجات کے عنوانات</h2>
+        <ul className="title-list">
+          {othersTitles.map((ot) =>
+            editingOtherTitle === ot.id ? (
+              <div key={ot.id} className="flex-container">
+                <input
+                  type="text"
+                  value={editingOtherTitleName}
+                  onChange={(e) => setEditingOtherTitleName(e.target.value)}
+                  onFocus={handleFocus}
+                  id={`editOtherTitle-${ot.id}`}
+                  className="input-text"
+                />
+                <button onClick={updateOtherTitle} className="button-save">
+                  محفوظ کریں
+                </button>
+                <button onClick={() => setEditingOtherTitle(null)} className="button-cancel">
+                  منسوخ
+                </button>
+              </div>
+            ) : (
+              <li key={ot.id} className="title-item">
+                {ot.name}
+                <div className="button-group">
+                  <button
+                    onClick={() => {
+                      setEditingOtherTitle(ot.id)
+                      setEditingOtherTitleName(ot.name)
+                    }}
+                    className="button-edit"
+                  >
+                    ترمیم
+                  </button>
+                  <button onClick={() => deleteOtherTitle(ot.id)} className="button-delete">
+                    حذف
+                  </button>
+                </div>
+              </li>
+            )
+          )}
+        </ul>
+
+        <form
+          onSubmit={(e) => {
+            e.preventDefault()
+            addOtherTitle()
+          }}
+          className="form"
+        >
+          <input
+            type="text"
+            placeholder="نیا متفرق عنوان"
+            value={newOtherTitle}
+            onChange={(e) => setNewOtherTitle(e.target.value)}
+            onFocus={handleFocus}
+            id="newOtherTitle"
+            className="input-text"
+          />
+          <button className="button-submit">شامل کریں</button>
+        </form>
+      </div>
+
+      {/* ================================================================
+       * Keyboard toggle
+       * ============================================================== */}
       <button
         type="button"
         className="keyboard-button"
@@ -711,7 +864,7 @@ export default function AdminPanel() {
         </svg>
       </button>
 
-      {/* Add logout button */}
+      {/* Logout */}
       <LogoutButton />
 
       {/* Urdu Keyboard */}

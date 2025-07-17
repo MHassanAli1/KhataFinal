@@ -1,12 +1,21 @@
-import React, { useState, useEffect, useRef } from 'react'
+import React, { useState, useEffect, useRef, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import './CreateTransactionForm.css'
 import UrduKeyboard from './UrduKeyboard'
+
+/* ------------------------------------------------------------------
+ * MUST MATCH the name value stored in AkhrajatTitle that represents
+ * the umbrella "Other / Mutafarik" category in your DB.
+ * ---------------------------------------------------------------- */
+const MUTAFARIK_LABEL = 'متفرق'
 
 export default function CreateTransactionForm() {
   const [formKey, setFormKey] = useState(0)
   const navigate = useNavigate()
 
+  /* ------------------------------------------------------------------
+   * Core form state
+   * ---------------------------------------------------------------- */
   const [zone, setZone] = useState('')
   const [khda, setKhda] = useState('')
 
@@ -20,21 +29,52 @@ export default function CreateTransactionForm() {
   const [kulMaizan, setKulMaizan] = useState(null)
 
   const [date, setDate] = useState('')
+
   const [akhrajat, setAkhrajat] = useState([])
+
   const [lastEnding, setLastEnding] = useState(0)
   const [zonesList, setZonesList] = useState([])
   const [khdaList, setKhdaList] = useState([])
-  const [akhrajatTitles, setAkhrajatTitles] = useState([])
-  const [bookNumber, setBookNumber] = useState('')
-  const [activeBookNumber, setActiveBookNumber] = useState('')
-  const [activeTicketNumber, setActiveTicketNumber] = useState(1)
+  const [akhrajatTitles, setAkhrajatTitles] = useState([]) // [name, ...]
+
+  /* ------------------------------------------------------------------
+   * Book / Ticket selection
+   * ---------------------------------------------------------------- */
+  const [booksForKhda, setBooksForKhda] = useState([]) // [{bookNumber, usedTickets,nextTicket,isFull}, ...]
+  const [selectedBookNumber, setSelectedBookNumber] = useState('') // value from dropdown
+  const [manualBookNumber, setManualBookNumber] = useState('') // user typed
+  const [useManualBook, setUseManualBook] = useState(false) // toggle when user wants new book
+
+  // Computed “active” values we actually submit
+  const activeBookNumber = useMemo(() => {
+    return useManualBook ? manualBookNumber.trim() : selectedBookNumber.trim()
+  }, [useManualBook, manualBookNumber, selectedBookNumber])
+
+  const activeTicketNumber = useMemo(() => {
+    if (useManualBook) return 1 // brand new
+    const found = booksForKhda.find((b) => b.bookNumber === selectedBookNumber)
+    if (!found) return 1
+    return found.nextTicket ?? found.usedTickets + 1 // safe fallback
+  }, [useManualBook, selectedBookNumber, booksForKhda])
+
   const [formError, setFormError] = useState('')
 
-  const [gariTitles, setGariTitles] = useState([])
-  const [gariExpenseTypes, setGariExpenseTypes] = useState([])
-  const [gariParts, setGariParts] = useState([])
+  const parseIntOrNull = (v) => {
+    const n = parseInt(v, 10)
+    return Number.isNaN(n) ? null : n
+  }
 
-  // Keyboard state
+  /* ------------------------------------------------------------------
+   * Admin metadata for gari & other sub‑forms
+   * ---------------------------------------------------------------- */
+  const [gariTitles, setGariTitles] = useState([]) // [name,...]
+  const [gariExpenseTypes, setGariExpenseTypes] = useState([]) // [name,...]
+  const [gariParts, setGariParts] = useState([]) // [name,...]
+  const [othersTitlesList, setOthersTitlesList] = useState([]) // [{id,name},...]
+
+  /* ------------------------------------------------------------------
+   * Virtual keyboard state
+   * ---------------------------------------------------------------- */
   const [showKeyboard, setShowKeyboard] = useState(false)
   const [activeInput, setActiveInput] = useState(null)
   const [inputRefs, setInputRefs] = useState({})
@@ -42,12 +82,15 @@ export default function CreateTransactionForm() {
   const khdaRef = useRef(null)
   const akhrajatRefs = useRef({})
 
-  //reset form function
+  /* ==================================================================
+   * Reset form
+   * ================================================================== */
   const resetForm = () => {
     if (document.activeElement instanceof HTMLElement && document.activeElement !== document.body) {
       document.activeElement.blur()
     }
     window.api.transactions.getLastEndingNumber().then(setLastEnding)
+
     setZone('')
     setKhda('')
     setStarting(null)
@@ -59,49 +102,60 @@ export default function CreateTransactionForm() {
     setExercise(null)
     setKulMaizan(null)
     setDate('')
+
     setAkhrajat([])
-    setBookNumber('')
-    setActiveBookNumber('')
-    setActiveTicketNumber(1)
+
+    // books
+    setBooksForKhda([])
+    setSelectedBookNumber('')
+    setManualBookNumber('')
+    setUseManualBook(false)
+
     setFormError('')
-    setKhdaList([]) // <- force khda list clear
-    closeKeyboard() // close the virtual keyboard explicitly
+    setKhdaList([])
+
+    closeKeyboard()
     setFormKey((k) => k + 1)
   }
 
+  /* ==================================================================
+   * Init fetch (static admin lookups)
+   * ================================================================== */
   useEffect(() => {
     window.api.transactions.getLastEndingNumber().then(setLastEnding)
 
-    // fetch zones
     window.api.admin.zones.getAll().then((zones) => {
       setZonesList(zones)
     })
 
-    // fetch akhrajat titles
     window.api.admin.akhrajatTitles.getAll().then((titles) => {
-      setAkhrajatTitles(titles.map((t) => t.name)) // assuming t.name is Urdu
+      // store name only; we detect Mutafarik by MUTAFARIK_LABEL
+      setAkhrajatTitles(titles.map((t) => t.name))
     })
 
-    // fetch Gari Expense Types (پٹرول, ڈیزل, مرمت, ٹیوننگ etc.)
     window.api.admin.gariExpenseTypes.getAll().then((types) => {
       setGariExpenseTypes(types.map((t) => t.name))
     })
 
-    // fetch Gari Parts (mobil oil, air filter etc.)
     window.api.admin.gariParts.getAll().then((parts) => {
       setGariParts(parts.map((p) => p.name))
     })
 
     window.api.admin.gariTitles.getAll().then((titles) => {
-      setGariTitles(titles.map((t) => t.name)) // assume name is Urdu name of vehicle
+      setGariTitles(titles.map((t) => t.name))
     })
 
-    // Initialize refs
-    setInputRefs({
-      khda: khdaRef
+    // NEW: load OthersTitles (Mutafarik child options)
+    window.api.admin.othersTitles.getAll().then((rows) => {
+      setOthersTitlesList(rows) // keep full objects {id,name}
     })
+
+    setInputRefs({ khda: khdaRef })
   }, [])
 
+  /* ==================================================================
+   * Fetch khdas when zone changes
+   * ================================================================== */
   useEffect(() => {
     if (zone && zone !== '' && !isNaN(Number(zone))) {
       window.api.admin.khdas
@@ -113,27 +167,107 @@ export default function CreateTransactionForm() {
           console.error('❌ khdas:getAll failed', err)
         })
     } else {
-      // zone was empty or invalid, so we clear khdas to avoid stale dropdown
       setKhdaList([])
     }
   }, [zone])
 
-  // Update refs when akhrajat changes
+  /* ==================================================================
+   * Load books when khda changes
+   * ================================================================== */
   useEffect(() => {
-    // Make sure akhrajatRefs object has a ref for each expense item
+    if (!khda) {
+      setBooksForKhda([])
+      setSelectedBookNumber('')
+      setManualBookNumber('')
+      setUseManualBook(false)
+      return
+    }
+    async function loadBooks() {
+      try {
+        const books = await window.api.transactions.getBooksByKhda(khda)
+        setBooksForKhda(books)
+
+        // Auto‑select logic:
+        const nonFull = books.filter((b) => !b.isFull)
+        if (nonFull.length === 1) {
+          setSelectedBookNumber(nonFull[0].bookNumber)
+          setUseManualBook(false)
+        } else {
+          setSelectedBookNumber('')
+          setUseManualBook(false)
+        }
+
+        // Backward‑compat fallback: if no books at all, try legacy getLatest
+        if (books.length === 0) {
+          const legacy = await window.api.transactions.getLatestByKhda(khda)
+          if (legacy?.bookNumber) {
+            setSelectedBookNumber(legacy.bookNumber)
+            setUseManualBook(false)
+          }
+        }
+      } catch (err) {
+        console.error('loadBooks error', err)
+        // fallback to legacy
+        window.api.transactions
+          .getLatestByKhda(khda)
+          .then((legacy) => {
+            if (legacy?.bookNumber) {
+              setSelectedBookNumber(legacy.bookNumber)
+              setUseManualBook(false)
+            }
+          })
+          .catch((err2) => {
+            console.error('legacy getLatestByKhda failed', err2)
+          })
+      }
+    }
+
+    loadBooks()
+  }, [khda])
+
+  /* ==================================================================
+   * Auto-calc total trollies from starting/ending
+   * ================================================================== */
+  useEffect(() => {
+    const s = parseIntOrNull(starting)
+    const e = parseIntOrNull(ending)
+
+    if (s != null && e != null && e >= s) {
+      // inclusive count
+      setTotal(String(e - s + 1))
+    } else {
+      setTotal('')
+    }
+  }, [starting, ending])
+
+  /* ==================================================================
+   * Build <option> list for book select
+   * ================================================================== */
+  const bookOptions = useMemo(() => {
+    const opts = booksForKhda.map((b) => ({
+      value: b.bookNumber,
+      label: `${b.bookNumber} (استعمال شدہ: ${b.usedTickets} / 100)`
+    }))
+    // manual entry sentinel
+    opts.push({ value: '__manual__', label: 'نیا کتاب نمبر درج کریں…' })
+    return opts
+  }, [booksForKhda])
+
+  /* ==================================================================
+   * Refs management for Urdu keyboard across dynamic list
+   * ================================================================== */
+  useEffect(() => {
     akhrajat.forEach((_, index) => {
       if (!akhrajatRefs.current[`desc-${index}`]) {
         akhrajatRefs.current[`desc-${index}`] = React.createRef()
       }
     })
 
-    // Update inputRefs with current akhrajat refs
     const akhrajatInputRefs = {}
     Object.keys(akhrajatRefs.current).forEach((key) => {
       if (key.startsWith('desc-')) {
         const index = parseInt(key.replace('desc-', ''), 10)
         if (index < akhrajat.length) {
-          // Only include refs for existing items
           akhrajatInputRefs[`akhrajat-${key}`] = akhrajatRefs.current[key]
         }
       }
@@ -145,40 +279,9 @@ export default function CreateTransactionForm() {
     }))
   }, [akhrajat])
 
-  useEffect(() => {
-    if (!khda) {
-      setActiveBookNumber('')
-      setActiveTicketNumber(1)
-      return
-    }
-
-    window.api.transactions
-      .getLatestByKhda(khda)
-      .then((latest) => {
-        if (!latest) {
-          // no transactions yet for this khda
-          setActiveBookNumber('')
-          setActiveTicketNumber(1)
-          return
-        }
-
-        if (latest.bookNumber && latest.ticketNumber < 100) {
-          setActiveBookNumber(latest.bookNumber)
-          setActiveTicketNumber(latest.ticketNumber + 1)
-        } else {
-          // book is full or missing, force user to enter new
-          setActiveBookNumber('')
-          setActiveTicketNumber(1)
-        }
-      })
-      .catch((err) => {
-        console.error('getLatestByKhda failed', err)
-        setActiveBookNumber('')
-        setActiveTicketNumber(1)
-      })
-  }, [khda])
-
-  // Handle keyboard input
+  /* ==================================================================
+   * Urdu keyboard handlers
+   * ================================================================== */
   const handleKeyPress = (char) => {
     if (!activeInput) return
 
@@ -191,32 +294,23 @@ export default function CreateTransactionForm() {
 
     if (char === 'backspace') {
       if (start === end && start > 0) {
-        // Delete character before cursor
         const newValue = input.value.substring(0, start - 1) + input.value.substring(end)
         updateInputValue(activeInput, newValue)
-
-        // Update cursor position
         setTimeout(() => {
           input.selectionStart = start - 1
           input.selectionEnd = start - 1
         }, 0)
       } else if (start !== end) {
-        // Delete selected text
         const newValue = input.value.substring(0, start) + input.value.substring(end)
         updateInputValue(activeInput, newValue)
-
-        // Update cursor position
         setTimeout(() => {
           input.selectionStart = start
           input.selectionEnd = start
         }, 0)
       }
     } else {
-      // Insert character at cursor position
       const newValue = input.value.substring(0, start) + char + input.value.substring(end)
       updateInputValue(activeInput, newValue)
-
-      // Update cursor position
       setTimeout(() => {
         input.focus()
         input.selectionStart = start + char.length
@@ -225,7 +319,6 @@ export default function CreateTransactionForm() {
     }
   }
 
-  // Update input value based on active input
   const updateInputValue = (inputName, value) => {
     if (inputName === 'khda') {
       setKhda(value)
@@ -237,29 +330,62 @@ export default function CreateTransactionForm() {
     }
   }
 
-  // Handle input focus
   const handleInputFocus = (inputName) => {
     setActiveInput(inputName)
     setShowKeyboard(true)
   }
 
-  // Close keyboard
   const closeKeyboard = () => {
     setShowKeyboard(false)
     setActiveInput(null)
   }
 
+  /* ==================================================================
+   * Akhrajat list maintenance
+   * ================================================================== */
   const addAkhrajat = () => {
-    setAkhrajat([...akhrajat, { description: '', amount: '', title: '', gariExpenses: [] }])
+    setAkhrajat((prev) => [
+      ...prev,
+      {
+        description: '',
+        amount: '',
+        title: '',
+        gariExpenses: [],
+        // NEW Other fields
+        othersTitlesId: null,
+        otherTitle: ''
+      }
+    ])
   }
 
   const updateAkhrajat = (index, field, value) => {
-    setAkhrajat((prev) => prev.map((item, i) => (i === index ? { ...item, [field]: value } : item)))
+    setAkhrajat((prev) =>
+      prev.map((item, i) => {
+        if (i !== index) return item
+        const next = { ...item, [field]: value }
+        // If user changes the main title, reset sub‑fields accordingly
+        if (field === 'title') {
+          if (value === MUTAFARIK_LABEL) {
+            // switching to Mutafarik -> clear gari fields, keep other fields
+            next.gariExpenses = []
+          } else if (gariTitles.includes(value)) {
+            // switching to gari -> clear other fields
+            next.othersTitlesId = null
+            next.otherTitle = ''
+          } else {
+            // plain -> clear both
+            next.gariExpenses = []
+            next.othersTitlesId = null
+            next.otherTitle = ''
+          }
+        }
+        return next
+      })
+    )
   }
 
   const removeAkhrajat = (index) => {
     setAkhrajat((prev) => prev.filter((_, i) => i !== index))
-
     setTimeout(() => {
       const rebuiltRefs = {}
       akhrajat.forEach((_, i) => {
@@ -268,18 +394,14 @@ export default function CreateTransactionForm() {
       akhrajatRefs.current = rebuiltRefs
     }, 0)
 
-    // Clean up refs for removed items
     const newAkhrajatRefs = { ...akhrajatRefs.current }
     delete newAkhrajatRefs[`desc-${index}`]
-
-    // Reassign indices for refs after the removed item
     for (let i = index + 1; i < akhrajat.length; i++) {
       if (newAkhrajatRefs[`desc-${i}`]) {
         newAkhrajatRefs[`desc-${i - 1}`] = newAkhrajatRefs[`desc-${i}`]
         delete newAkhrajatRefs[`desc-${i}`]
       }
     }
-
     akhrajatRefs.current = newAkhrajatRefs
   }
 
@@ -287,9 +409,12 @@ export default function CreateTransactionForm() {
     navigate('/')
   }
 
+  /* ==================================================================
+   * Submit
+   * ================================================================== */
   const handleSubmit = async (e) => {
     e.preventDefault()
-    setFormError('') // clear any previous error
+    setFormError('')
 
     const user = await window.api.auth.getSession()
     try {
@@ -309,11 +434,18 @@ export default function CreateTransactionForm() {
         return
       }
 
-      const usedBookNumber = activeBookNumber || bookNumber
-      if (!usedBookNumber) {
-        setFormError('براہ کرم کتاب نمبر درج کریں۔')
+      if (!activeBookNumber) {
+        setFormError('براہ کرم کتاب نمبر منتخب یا درج کریں۔')
         return
       }
+
+      // Validate manual book number not colliding w/ selected
+      if (useManualBook && booksForKhda.some((b) => b.bookNumber === manualBookNumber.trim())) {
+        setFormError('یہ کتاب نمبر پہلے سے فعال ہے۔')
+        return
+      }
+
+      // Validate gari sub‑records
       const hasIncompleteGari = akhrajat.some((item) => {
         if (!gariTitles.includes(item.title)) return false
         const type = item.gariExpenses?.[0]?.title
@@ -322,43 +454,83 @@ export default function CreateTransactionForm() {
         if (type === 'مرمت' && !item.gariExpenses?.[0]?.part) return true
         return false
       })
-
       if (hasIncompleteGari) {
         setFormError('گاڑی اخراجات کے مکمل تفصیل درج کریں۔')
         return
       }
 
+      // Validate Other (Mutafarik) sub‑records
+      const hasIncompleteOther = akhrajat.some((item) => {
+        if (item.title !== MUTAFARIK_LABEL) return false
+        // must choose existing id OR type something in otherTitle OR description
+        return !item.othersTitlesId && !item.otherTitle && !item.description
+      })
+      if (hasIncompleteOther) {
+        setFormError('متفرق اخراجات کے ذیلی عنوان کا انتخاب کریں یا تفصیل لکھیں۔')
+        return
+      }
+
+      // Normalize numbers (avoid sending '' to BigInt) --------------------
+      const nKulAmdan = kulAmdan === null || kulAmdan === '' ? 0 : Number(kulAmdan)
+      const nKulAkhrajat = kulAkhrajat === null || kulAkhrajat === '' ? 0 : Number(kulAkhrajat)
+      const nSaafiAmdan = saafiAmdan === null || saafiAmdan === '' ? 0 : Number(saafiAmdan)
+      const nExercise = exercise === null || exercise === '' ? 0 : Number(exercise)
+      const nKulMaizan = kulMaizan === null || kulMaizan === '' ? 0 : Number(kulMaizan)
+
+      // Build payload akhrajat --------------------------------------------
+      const payloadAkhrajat = akhrajat.map((item) => {
+        const isGari = gariTitles.includes(item.title)
+        const isOther = item.title === MUTAFARIK_LABEL
+        const amt = item.amount === '' || item.amount == null ? 0 : item.amount
+
+        const row = {
+          ...item,
+          amount: amt,
+          isGari,
+          isOther,
+          date
+        }
+
+        if (isOther) {
+          // choose ID if available
+          if (item.othersTitlesId) {
+            row.othersTitlesId = Number(item.othersTitlesId)
+          }
+          // if user typed a new label in otherTitle, include it (server may auto-create)
+          if (item.otherTitle && !item.othersTitlesId) {
+            row.otherTitle = item.otherTitle.trim()
+          }
+        }
+
+        return row
+      })
+
+      // Send ---------------------------------------------------------------
       await window.api.transactions.create({
         userID: user.id,
         ZoneName: zoneName,
         KhdaName: khda,
         StartingNum: starting,
         EndingNum: ending,
-        total,
-        bookNumber: usedBookNumber,
-        KulAmdan: BigInt(kulAmdan || 0),
-        KulAkhrajat: BigInt(kulAkhrajat || 0),
-        SaafiAmdan: BigInt(saafiAmdan || 0),
-        Exercise: BigInt(exercise || 0),
-        KulMaizan: BigInt(kulMaizan || 0),
+        total: total || 0,
+        bookNumber: activeBookNumber,
+        KulAmdan: BigInt(nKulAmdan),
+        KulAkhrajat: BigInt(nKulAkhrajat),
+        SaafiAmdan: BigInt(nSaafiAmdan),
+        Exercise: BigInt(nExercise),
+        KulMaizan: BigInt(nKulMaizan),
         date,
-        akhrajat: akhrajat.map((item) => ({
-          ...item,
-          isGari: gariTitles.includes(item.title), // ✅ Explicitly set
-          date
-        }))
+        akhrajat: payloadAkhrajat
       })
 
       window.focus()
-      // optionally you can reset form here
       resetForm()
-      // forcibly re-fetch zones so the dropdown is consistent
+
+      // refresh zones
       window.api.admin.zones.getAll().then((zones) => {
         setZonesList(zones)
       })
-      // forcibly clear khdaList
-      setKhdaList([])
-      // and set khda to ''
+
       setKhda('')
       setFormError('✅ Transaction saved!')
     } catch (err) {
@@ -367,6 +539,9 @@ export default function CreateTransactionForm() {
     }
   }
 
+  /* ==================================================================
+   * Render
+   * ================================================================== */
   return (
     <div className="form-container">
       <div className="form-header">
@@ -401,9 +576,7 @@ export default function CreateTransactionForm() {
           <select
             id="zone"
             value={zone}
-            onChange={(e) => {
-              setZone(e.target.value)
-            }}
+            onChange={(e) => setZone(e.target.value)}
             className="form-select"
           >
             <option value="">-- منتخب کریں --</option>
@@ -420,6 +593,7 @@ export default function CreateTransactionForm() {
             className="form-select"
             value={khda}
             onChange={(e) => setKhda(e.target.value)}
+            ref={khdaRef}
           >
             <option value="">-- منتخب کریں --</option>
             {khdaList.map((k) => (
@@ -429,16 +603,46 @@ export default function CreateTransactionForm() {
             ))}
           </select>
 
-          <label htmlFor="bookNumber">کتاب نمبر:</label>
-          <input
-            id="bookNumber"
-            className="form-input"
-            placeholder="کتاب نمبر"
-            value={activeBookNumber || bookNumber || ``}
-            onChange={(e) => setBookNumber(e.target.value)}
-            disabled={!!activeBookNumber} // user cannot change once locked
-          />
+          {/* ------------------------------------------------------------
+           * Book selector (supports multiple active books)
+           * ------------------------------------------------------------ */}
+          <label htmlFor="bookSelect">کتاب نمبر منتخب کریں:</label>
+          <select
+            id="bookSelect"
+            className="form-select"
+            value={useManualBook ? '__manual__' : selectedBookNumber}
+            onChange={(e) => {
+              const val = e.target.value
+              if (val === '__manual__') {
+                setUseManualBook(true)
+                setSelectedBookNumber('')
+              } else {
+                setUseManualBook(false)
+                setSelectedBookNumber(val)
+              }
+            }}
+            disabled={!khda}
+          >
+            <option value="">-- منتخب کریں --</option>
+            {bookOptions.map((opt) => (
+              <option key={opt.value} value={opt.value}>
+                {opt.label}
+              </option>
+            ))}
+          </select>
 
+          {/* Manual book input when needed */}
+          {useManualBook && (
+            <input
+              id="bookNumber"
+              className="form-input"
+              placeholder="نیا کتاب نمبر"
+              value={manualBookNumber}
+              onChange={(e) => setManualBookNumber(e.target.value)}
+            />
+          )}
+
+          {/* Ticket display */}
           <div className="ticket-number-hint">
             موجودہ ٹکٹ نمبر: <strong>{activeTicketNumber}</strong> / 100
           </div>
@@ -473,7 +677,7 @@ export default function CreateTransactionForm() {
             className="form-input"
             placeholder="کل ٹرالیاں"
             value={total ?? ``}
-            onChange={(e) => setTotal(e.target.value)}
+            readOnly // ← auto-calculated
             type="number"
             dir="ltr"
             onWheel={(e) => e.target.blur()}
@@ -552,116 +756,165 @@ export default function CreateTransactionForm() {
           <h4 className="section-title">اخراجات کی تفصیل</h4>
 
           <div className="akhrajat-container">
-            {akhrajat.map((item, index) => (
-              <div key={index} className="akhrajat-item">
-                <div className="akhrajat-inputs">
-                  <div className="akhrajat-title">
-                    <select
-                      className="form-select akhrajat-title"
-                      value={item.title || ``}
-                      onChange={(e) => updateAkhrajat(index, 'title', e.target.value)}
-                    >
-                      <option value="">-- عنوان منتخب کریں --</option>
-                      {akhrajatTitles.map((title) => (
-                        <option key={title} value={title}>
-                          {title}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <div className="akhrajat-description-amount">
-                    <input
-                      className={`form-input akhrajat-description ${activeInput === `akhrajat-desc-${index}` ? 'active-input' : ''}`}
-                      placeholder="تفصیل"
-                      value={item.description || ``}
-                      onChange={(e) => updateAkhrajat(index, 'description', e.target.value)}
-                      onFocus={() => handleInputFocus(`akhrajat-desc-${index}`)}
-                      ref={(el) => {
-                        akhrajatRefs.current[`desc-${index}`] = { current: el }
-                      }}
-                    />
-                    <input
-                      className="form-input akhrajat-amount"
-                      placeholder="رقم"
-                      type="number"
-                      value={item.amount ?? ``}
-                      onChange={(e) => updateAkhrajat(index, 'amount', e.target.value)}
-                      dir="ltr"
-                      onWheel={(e) => e.target.blur()}
-                    />
-                    {gariTitles.includes(item.title) && (
-                      <div className="gari-expense-section">
-                        <label>گاڑی خرچ کی قسم:</label>
-                        <select
-                          className="form-select"
-                          value={item.gariExpenses?.[0]?.title || ''}
-                          onChange={(e) => {
-                            const title = e.target.value
-                            const updated = { title }
+            {akhrajat.map((item, index) => {
+              const isGari = gariTitles.includes(item.title)
+              const isOther = item.title === MUTAFARIK_LABEL
 
-                            if (['پٹرول', 'ڈیزل'].includes(title)) {
-                              updated.quantity = ''
-                            } else if (title === 'مرمت') {
-                              updated.part = ''
-                            }
+              return (
+                <div key={index} className="akhrajat-item">
+                  <div className="akhrajat-inputs">
+                    <div className="akhrajat-title">
+                      <select
+                        className="form-select akhrajat-title"
+                        value={item.title || ``}
+                        onChange={(e) => updateAkhrajat(index, 'title', e.target.value)}
+                      >
+                        <option value="">-- عنوان منتخب کریں --</option>
+                        {akhrajatTitles.map((title) => (
+                          <option key={title} value={title}>
+                            {title}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="akhrajat-description-amount">
+                      <input
+                        className={`form-input akhrajat-description ${
+                          activeInput === `akhrajat-desc-${index}` ? 'active-input' : ''
+                        }`}
+                        placeholder="تفصیل"
+                        value={item.description || ``}
+                        onChange={(e) => updateAkhrajat(index, 'description', e.target.value)}
+                        onFocus={() => handleInputFocus(`akhrajat-desc-${index}`)}
+                        ref={(el) => {
+                          akhrajatRefs.current[`desc-${index}`] = { current: el }
+                        }}
+                      />
+                      <input
+                        className="form-input akhrajat-amount"
+                        placeholder="رقم"
+                        type="number"
+                        value={item.amount ?? ``}
+                        onChange={(e) => updateAkhrajat(index, 'amount', e.target.value)}
+                        dir="ltr"
+                        onWheel={(e) => e.target.blur()}
+                      />
 
-                            updateAkhrajat(index, 'gariExpenses', [updated])
-                          }}
-                        >
-                          <option value="">-- قسم منتخب کریں --</option>
-                          {gariExpenseTypes.map((type) => (
-                            <option key={type} value={type}>
-                              {type}
-                            </option>
-                          ))}
-                        </select>
-
-                        {['پٹرول', 'ڈیزل'].includes(item.gariExpenses?.[0]?.title) && (
-                          <input
-                            type="number"
-                            placeholder="مقدار (لیٹر)"
-                            className="form-input"
-                            value={item.gariExpenses[0]?.quantity || ''}
-                            onChange={(e) => {
-                              const updated = [...item.gariExpenses]
-                              updated[0].quantity = e.target.value
-                              updateAkhrajat(index, 'gariExpenses', updated)
-                            }}
-                          />
-                        )}
-
-                        {item.gariExpenses?.[0]?.title === 'مرمت' && (
+                      {/* ================= GARI SUB-FIELDS ================= */}
+                      {isGari && (
+                        <div className="gari-expense-section">
+                          <label>گاڑی خرچ کی قسم:</label>
                           <select
                             className="form-select"
-                            value={item.gariExpenses[0]?.part || ''}
+                            value={item.gariExpenses?.[0]?.title || ''}
                             onChange={(e) => {
-                              const updated = [...item.gariExpenses]
-                              updated[0].part = e.target.value
-                              updateAkhrajat(index, 'gariExpenses', updated)
+                              const title = e.target.value
+                              const updated = { title }
+                              if (['پٹرول', 'ڈیزل'].includes(title)) {
+                                updated.quantity = ''
+                              } else if (title === 'مرمت') {
+                                updated.part = ''
+                              }
+                              updateAkhrajat(index, 'gariExpenses', [updated])
                             }}
                           >
-                            <option value="">-- پرزہ منتخب کریں --</option>
-                            {gariParts.map((part) => (
-                              <option key={part} value={part}>
-                                {part}
+                            <option value="">-- قسم منتخب کریں --</option>
+                            {gariExpenseTypes.map((type) => (
+                              <option key={type} value={type}>
+                                {type}
                               </option>
                             ))}
                           </select>
-                        )}
-                      </div>
-                    )}
+
+                          {['پٹرول', 'ڈیزل'].includes(item.gariExpenses?.[0]?.title) && (
+                            <input
+                              type="number"
+                              placeholder="مقدار (لیٹر)"
+                              className="form-input"
+                              value={item.gariExpenses[0]?.quantity || ''}
+                              onChange={(e) => {
+                                const updated = [...(item.gariExpenses || [])]
+                                updated[0].quantity = e.target.value
+                                updateAkhrajat(index, 'gariExpenses', updated)
+                              }}
+                            />
+                          )}
+
+                          {item.gariExpenses?.[0]?.title === 'مرمت' && (
+                            <select
+                              className="form-select"
+                              value={item.gariExpenses[0]?.part || ''}
+                              onChange={(e) => {
+                                const updated = [...(item.gariExpenses || [])]
+                                updated[0].part = e.target.value
+                                updateAkhrajat(index, 'gariExpenses', updated)
+                              }}
+                            >
+                              <option value="">-- پرزہ منتخب کریں --</option>
+                              {gariParts.map((part) => (
+                                <option key={part} value={part}>
+                                  {part}
+                                </option>
+                              ))}
+                            </select>
+                          )}
+                        </div>
+                      )}
+
+                      {/* ================= OTHER (MUTAFARIK) SUB-FIELDS ================= */}
+                      {isOther && (
+                        <div className="other-expense-section">
+                          <label>متفرق ذیلی عنوان:</label>
+                          <select
+                            className="form-select"
+                            value={item.othersTitlesId ?? ''}
+                            onChange={(e) => {
+                              const val = e.target.value
+                              if (val === '__new__') {
+                                updateAkhrajat(index, 'othersTitlesId', null)
+                                updateAkhrajat(index, 'otherTitle', '')
+                              } else if (val === '') {
+                                updateAkhrajat(index, 'othersTitlesId', null)
+                              } else {
+                                updateAkhrajat(index, 'othersTitlesId', Number(val))
+                                updateAkhrajat(index, 'otherTitle', '')
+                              }
+                            }}
+                          >
+                            <option value="">-- منتخب کریں --</option>
+                            {othersTitlesList.map((ot) => (
+                              <option key={ot.id} value={ot.id}>
+                                {ot.name}
+                              </option>
+                            ))}
+                            <option value="__new__">+ نیا متفرق عنوان</option>
+                          </select>
+
+                          {/* show input when creating a new Other subtype */}
+                          {item.othersTitlesId == null && (
+                            <input
+                              type="text"
+                              className="form-input"
+                              placeholder="نیا متفرق عنوان"
+                              value={item.otherTitle || ''}
+                              onChange={(e) => updateAkhrajat(index, 'otherTitle', e.target.value)}
+                            />
+                          )}
+                        </div>
+                      )}
+                    </div>
                   </div>
+                  <button
+                    type="button"
+                    className="remove-btn"
+                    onClick={() => removeAkhrajat(index)}
+                    aria-label="Remove expense"
+                  >
+                    ❌
+                  </button>
                 </div>
-                <button
-                  type="button"
-                  className="remove-btn"
-                  onClick={() => removeAkhrajat(index)}
-                  aria-label="Remove expense"
-                >
-                  ❌
-                </button>
-              </div>
-            ))}
+              )
+            })}
           </div>
 
           <button type="button" className="add-btn" onClick={addAkhrajat}>
@@ -676,7 +929,7 @@ export default function CreateTransactionForm() {
         </div>
       </form>
 
-      {/* Add keyboard toggle button */}
+      {/* Urdu keyboard toggle */}
       <button
         type="button"
         className="keyboard-toggle"
@@ -688,7 +941,6 @@ export default function CreateTransactionForm() {
         </span>
       </button>
 
-      {/* Render the Urdu keyboard when needed */}
       {showKeyboard && <UrduKeyboard onKeyPress={handleKeyPress} onClose={closeKeyboard} />}
     </div>
   )
