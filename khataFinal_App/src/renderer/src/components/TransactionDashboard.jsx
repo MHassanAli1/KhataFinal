@@ -736,14 +736,14 @@ function TransactionDashboard() {
               onClick={() => handleNavigation('./GariSummary')}
             >
               <span className="btn-icon">🚗</span>
-              <span className="btn-text">Gari ka khulasa</span>
+              <span className="btn-text">گاڑی کا خلاصہ</span>
             </button>
             <button
               className="bottom-nav-btn primary"
               onClick={() => handleNavigation('./MutafarikAkhrajatSummary')}
             >
               <span className="btn-icon">⛩️</span>
-              <span className="btn-text">Mutafarik Akhrajat</span>
+              <span className="btn-text">متفرق اخراجات</span>
             </button>
           </div>
         </div>
