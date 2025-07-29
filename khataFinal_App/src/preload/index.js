@@ -18,9 +18,7 @@ const api = {
     getById: (id) => ipcRenderer.invoke('transactions:getById', id),
     update: (payload) => ipcRenderer.invoke('transactions:update', payload),
     delete: (id) => ipcRenderer.invoke('transactions:delete', id),
-    deleteBookByNumber: (bookNumber) =>
-      ipcRenderer.invoke('transactions:deleteBookByNumber', bookNumber),
-    deleteFromTicket: (id) => ipcRenderer.invoke('transactions:deleteFromTicket', id),
+    deleteFromTrolly: (id) => ipcRenderer.invoke('transactions:deleteFromTicket', id),
     search: (query) => ipcRenderer.invoke('transactions:search', query),
     getOne: (id) => ipcRenderer.invoke('transaction:getOne', id), // legacy alias
     getLatestByKhda: (khdaName) => ipcRenderer.invoke('transactions:getLatestByKhda', khdaName),
@@ -39,7 +37,9 @@ const api = {
       ipcRenderer.invoke('transactions:registerActiveBook', { zoneName, khdaName, bookNumber }),
 
     getActiveBookByZone: (zoneName, khdaName) =>
-      ipcRenderer.invoke('transactions:getActiveBookByZone', { zoneName, khdaName })
+      ipcRenderer.invoke('transactions:getActiveBookByZone', { zoneName, khdaName }),
+    deleteActiveBook: (bookId) => ipcRenderer.invoke('transactions:deleteActiveBook', bookId),
+    deleteTrolly: (id) => ipcRenderer.invoke('transactions:deleteTrolly', id)
   },
   akhrajat: {
     create: (data) => ipcRenderer.invoke('akhrajat:create', data),

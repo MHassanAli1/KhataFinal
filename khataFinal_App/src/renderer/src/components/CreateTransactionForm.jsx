@@ -1,7 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { toast } from 'react-toastify'
 import './CreateTransactionForm.css'
 import UrduKeyboard from './UrduKeyboard'
+import { ToastContainer } from 'react-toastify'
+import 'react-toastify/dist/ReactToastify.css'
 
 /* ------------------------------------------------------------------
  * MUST MATCH the name value stored in AkhrajatTitle that represents
@@ -18,28 +21,21 @@ export default function CreateTransactionForm() {
    * ---------------------------------------------------------------- */
   const [zone, setZone] = useState('')
   const [khda, setKhda] = useState('')
-
   const [kulAmdan, setKulAmdan] = useState(null)
   const [kulAkhrajat, setKulAkhrajat] = useState(null)
   const [saafiAmdan, setSaafiAmdan] = useState(null)
   const [exercise, setExercise] = useState(null)
   const [kulMaizan, setKulMaizan] = useState(null)
-
   const [date, setDate] = useState('')
-
   const [akhrajat, setAkhrajat] = useState([])
-
   const [zonesList, setZonesList] = useState([])
   const [khdaList, setKhdaList] = useState([])
-  const [akhrajatTitles, setAkhrajatTitles] = useState([]) // [name, ...]
-
-  const [booksForKhda, setBooksForKhda] = useState([]) // [{ bookNumber, usedTickets }, …]
+  const [akhrajatTitles, setAkhrajatTitles] = useState([])
+  const [booksForKhda, setBooksForKhda] = useState([])
   const [selectedBookNumber, setSelectedBookNumber] = useState('')
-  // these two now driven by book + total:
   const [starting, setStarting] = useState(null)
   const [ending, setEnding] = useState(null)
   const [total, setTotal] = useState('')
-
   const [formError, setFormError] = useState('')
 
   const parseIntOrNull = (v) => {
@@ -50,10 +46,10 @@ export default function CreateTransactionForm() {
   /* ------------------------------------------------------------------
    * Admin metadata for gari & other sub‑forms
    * ---------------------------------------------------------------- */
-  const [gariTitles, setGariTitles] = useState([]) // [name,...]
-  const [gariExpenseTypes, setGariExpenseTypes] = useState([]) // [name,...]
-  const [gariParts, setGariParts] = useState([]) // [name,...]
-  const [othersTitlesList, setOthersTitlesList] = useState([]) // [{id,name},...]
+  const [gariTitles, setGariTitles] = useState([])
+  const [gariExpenseTypes, setGariExpenseTypes] = useState([])
+  const [gariParts, setGariParts] = useState([])
+  const [othersTitlesList, setOthersTitlesList] = useState([])
 
   /* ------------------------------------------------------------------
    * Virtual keyboard state
@@ -61,7 +57,6 @@ export default function CreateTransactionForm() {
   const [showKeyboard, setShowKeyboard] = useState(false)
   const [activeInput, setActiveInput] = useState(null)
   const [inputRefs, setInputRefs] = useState({})
-
   const khdaRef = useRef(null)
   const akhrajatRefs = useRef({})
 
@@ -72,7 +67,6 @@ export default function CreateTransactionForm() {
     if (document.activeElement instanceof HTMLElement && document.activeElement !== document.body) {
       document.activeElement.blur()
     }
-
     setZone('')
     setKhda('')
     setStarting(null)
@@ -84,16 +78,11 @@ export default function CreateTransactionForm() {
     setExercise(null)
     setKulMaizan(null)
     setDate('')
-
     setAkhrajat([])
-
-    // books
     setBooksForKhda([])
     setSelectedBookNumber('')
-
     setFormError('')
     setKhdaList([])
-
     closeKeyboard()
     setFormKey((k) => k + 1)
   }
@@ -102,32 +91,20 @@ export default function CreateTransactionForm() {
    * Init fetch (static admin lookups)
    * ================================================================== */
   useEffect(() => {
-    window.api.admin.zones.getAll().then((zones) => {
-      setZonesList(zones)
-    })
-
+    window.api.admin.zones.getAll().then(setZonesList)
     window.api.admin.akhrajatTitles.getAll().then((titles) => {
-      // store name only; we detect Mutafarik by MUTAFARIK_LABEL
       setAkhrajatTitles(titles.map((t) => t.name))
     })
-
     window.api.admin.gariExpenseTypes.getAll().then((types) => {
       setGariExpenseTypes(types.map((t) => t.name))
     })
-
     window.api.admin.gariParts.getAll().then((parts) => {
       setGariParts(parts.map((p) => p.name))
     })
-
     window.api.admin.gariTitles.getAll().then((titles) => {
       setGariTitles(titles.map((t) => t.name))
     })
-
-    // NEW: load OthersTitles (Mutafarik child options)
-    window.api.admin.othersTitles.getAll().then((rows) => {
-      setOthersTitlesList(rows) // keep full objects {id,name}
-    })
-
+    window.api.admin.othersTitles.getAll().then(setOthersTitlesList)
     setInputRefs({ khda: khdaRef })
   }, [])
 
@@ -152,25 +129,21 @@ export default function CreateTransactionForm() {
   /* ==================================================================
    * Load books when khda changes
    * ================================================================== */
-  // when zone or khda changes, fetch active books
   useEffect(() => {
     if (!zone || !khda) {
       setBooksForKhda([])
       setSelectedBookNumber('')
       return
     }
-
     const zoneName = zonesList.find((z) => z.id === +zone)?.name
     if (!zoneName) {
       setBooksForKhda([])
       setSelectedBookNumber('')
       return
     }
-
     window.api.transactions
       .getActiveBookByZone(zoneName, khda)
       .then((books) => {
-        console.log('Fetched books:', books)
         setBooksForKhda(books)
         const nonFull = books.filter((b) => b.usedTickets < 100)
         if (nonFull.length === 1) {
@@ -184,7 +157,6 @@ export default function CreateTransactionForm() {
       })
   }, [zone, khda, zonesList])
 
-  //2) whenever user picks a book, compute the trolly start
   useEffect(() => {
     if (!selectedBookNumber) {
       setStarting(null)
@@ -202,26 +174,37 @@ export default function CreateTransactionForm() {
   useEffect(() => {
     const s = parseIntOrNull(starting)
     const e = parseIntOrNull(ending)
-
     if (s != null && e != null && e >= s) {
-      // inclusive count
       setTotal(String(e - s + 1))
     } else {
       setTotal('')
     }
   }, [starting, ending])
-  // Auto-calculate Saafi Amdan whenever Kul Amdan or Kul Akhrajat changes
+
+  /* ==================================================================
+   * Auto-calc kulAkhrajat from akhrajat amounts
+   * ================================================================== */
+  useEffect(() => {
+    const totalAkhrajat = akhrajat.reduce((sum, item) => {
+      const amount = parseFloat(item.amount)
+      return sum + (isNaN(amount) ? 0 : amount)
+    }, 0)
+    setKulAkhrajat(totalAkhrajat || null)
+  }, [akhrajat])
+
+  /* ==================================================================
+   * Auto-calc Saafi Amdan and Kul Maizan
+   * ================================================================== */
   useEffect(() => {
     const amdan = parseFloat(kulAmdan) || 0
     const akhrajat = parseFloat(kulAkhrajat) || 0
-    setSaafiAmdan(amdan - akhrajat)
+    setSaafiAmdan(amdan - akhrajat || null)
   }, [kulAmdan, kulAkhrajat])
 
-  // Auto-calculate Kul Maizan whenever Saafi Amdan or Exercise changes
   useEffect(() => {
     const saafi = parseFloat(saafiAmdan) || 0
     const exc = parseFloat(exercise) || 0
-    setKulMaizan(saafi + exc)
+    setKulMaizan(saafi + exc || null)
   }, [saafiAmdan, exercise])
 
   /* ==================================================================
@@ -233,7 +216,6 @@ export default function CreateTransactionForm() {
         akhrajatRefs.current[`desc-${index}`] = React.createRef()
       }
     })
-
     const akhrajatInputRefs = {}
     Object.keys(akhrajatRefs.current).forEach((key) => {
       if (key.startsWith('desc-')) {
@@ -243,7 +225,6 @@ export default function CreateTransactionForm() {
         }
       }
     })
-
     setInputRefs((prev) => ({
       ...prev,
       ...akhrajatInputRefs
@@ -255,10 +236,8 @@ export default function CreateTransactionForm() {
    * ================================================================== */
   const handleKeyPress = (char) => {
     if (!activeInput) return
-
     const inputRef = inputRefs[activeInput]
     if (!inputRef || !inputRef.current) return
-
     const input = inputRef.current
     const start = input.selectionStart
     const end = input.selectionEnd
@@ -322,7 +301,6 @@ export default function CreateTransactionForm() {
         amount: '',
         title: '',
         gariExpenses: [],
-        // NEW Other fields
         othersTitlesId: null,
         otherTitle: ''
       }
@@ -334,17 +312,13 @@ export default function CreateTransactionForm() {
       prev.map((item, i) => {
         if (i !== index) return item
         const next = { ...item, [field]: value }
-        // If user changes the main title, reset sub‑fields accordingly
         if (field === 'title') {
           if (value === MUTAFARIK_LABEL) {
-            // switching to Mutafarik -> clear gari fields, keep other fields
             next.gariExpenses = []
           } else if (gariTitles.includes(value)) {
-            // switching to gari -> clear other fields
             next.othersTitlesId = null
             next.otherTitle = ''
           } else {
-            // plain -> clear both
             next.gariExpenses = []
             next.othersTitlesId = null
             next.otherTitle = ''
@@ -364,7 +338,6 @@ export default function CreateTransactionForm() {
       })
       akhrajatRefs.current = rebuiltRefs
     }, 0)
-
     const newAkhrajatRefs = { ...akhrajatRefs.current }
     delete newAkhrajatRefs[`desc-${index}`]
     for (let i = index + 1; i < akhrajat.length; i++) {
@@ -391,21 +364,53 @@ export default function CreateTransactionForm() {
     try {
       if (!user?.id) {
         setFormError('صارف نہیں ملا، دوبارہ لاگ ان کریں۔')
+        toast.error('صارف نہیں ملا، دوبارہ لاگ ان کریں۔')
         return
       }
 
       const zoneName = zonesList.find((z) => z.id === Number(zone))?.name || ''
       if (!zoneName) {
         setFormError('براہ کرم زون منتخب کریں۔')
+        toast.error('براہ کرم زون منتخب کریں۔')
         return
       }
 
       if (!khda) {
         setFormError('براہ کرم کھدہ منتخب کریں۔')
+        toast.error('براہ کرم کھدہ منتخب کریں۔')
         return
       }
 
-      // Validate gari sub‑records
+      if (!selectedBookNumber) {
+        setFormError('براہ کرم کتاب نمبر منتخب کریں۔')
+        toast.error('براہ کرم کتاب نمبر منتخب کریں۔')
+        return
+      }
+
+      if (!total || parseInt(total) <= 0) {
+        setFormError('کل ٹرالیوں کی تعداد درست نہیں ہے۔')
+        toast.error('کل ٹرالیوں کی تعداد درست نہیں ہے۔')
+        return
+      }
+
+      if (!ending) {
+        setFormError('اختتامی نمبر درج کریں۔')
+        toast.error('اختتامی نمبر درج کریں۔')
+        return
+      }
+
+      // Validate akhrajat amounts
+      const hasInvalidAkhrajat = akhrajat.some((item) => {
+        if (!item.title) return true
+        const amount = parseFloat(item.amount)
+        return item.amount === '' || isNaN(amount) || amount < 0
+      })
+      if (hasInvalidAkhrajat) {
+        setFormError('تمام اخراجات کے لیے درست رقم درج کریں۔')
+        toast.error('تمام اخراجات کے لیے درست رقم درج کریں۔')
+        return
+      }
+
       const hasIncompleteGari = akhrajat.some((item) => {
         if (!gariTitles.includes(item.title)) return false
         const type = item.gariExpenses?.[0]?.title
@@ -416,33 +421,30 @@ export default function CreateTransactionForm() {
       })
       if (hasIncompleteGari) {
         setFormError('گاڑی اخراجات کے مکمل تفصیل درج کریں۔')
+        toast.error('گاڑی اخراجات کے مکمل تفصیل درج کریں۔')
         return
       }
 
-      // Validate Other (Mutafarik) sub‑records
       const hasIncompleteOther = akhrajat.some((item) => {
         if (item.title !== MUTAFARIK_LABEL) return false
-        // must choose existing id OR type something in otherTitle OR description
         return !item.othersTitlesId && !item.otherTitle && !item.description
       })
       if (hasIncompleteOther) {
         setFormError('متفرق اخراجات کے ذیلی عنوان کا انتخاب کریں یا تفصیل لکھیں۔')
+        toast.error('متفرق اخراجات کے ذیلی عنوان کا انتخاب کریں یا تفصیل لکھیں۔')
         return
       }
 
-      // Normalize numbers (avoid sending '' to BigInt) --------------------
       const nKulAmdan = kulAmdan === null || kulAmdan === '' ? 0 : Number(kulAmdan)
       const nKulAkhrajat = kulAkhrajat === null || kulAkhrajat === '' ? 0 : Number(kulAkhrajat)
       const nSaafiAmdan = saafiAmdan === null || saafiAmdan === '' ? 0 : Number(saafiAmdan)
       const nExercise = exercise === null || exercise === '' ? 0 : Number(exercise)
       const nKulMaizan = kulMaizan === null || kulMaizan === '' ? 0 : Number(kulMaizan)
 
-      // Build payload akhrajat --------------------------------------------
       const payloadAkhrajat = akhrajat.map((item) => {
         const isGari = gariTitles.includes(item.title)
         const isOther = item.title === MUTAFARIK_LABEL
-        const amt = item.amount === '' || item.amount == null ? 0 : item.amount
-
+        const amt = item.amount === '' || item.amount == null ? 0 : Number(item.amount)
         const row = {
           ...item,
           amount: amt,
@@ -450,29 +452,24 @@ export default function CreateTransactionForm() {
           isOther,
           date
         }
-
         if (isOther) {
-          // choose ID if available
           if (item.othersTitlesId) {
             row.othersTitlesId = Number(item.othersTitlesId)
           }
-          // if user typed a new label in otherTitle, include it (server may auto-create)
           if (item.otherTitle && !item.othersTitlesId) {
             row.otherTitle = item.otherTitle.trim()
           }
         }
-
         return row
       })
 
-      // Send ---------------------------------------------------------------
       await window.api.transactions.create({
         userID: user.id,
         ZoneName: zoneName,
         KhdaName: khda,
-        bookNumber: Number(selectedBookNumber), // ← send the book
-        totalTickets: Number(total), // ← send the tickets count
-        EndingNum: Number(ending), // ← as your IPC expects
+        bookNumber: Number(selectedBookNumber),
+        totalTickets: Number(total),
+        EndingNum: Number(ending),
         KulAmdan: BigInt(nKulAmdan),
         KulAkhrajat: BigInt(nKulAkhrajat),
         SaafiAmdan: BigInt(nSaafiAmdan),
@@ -484,17 +481,13 @@ export default function CreateTransactionForm() {
 
       window.focus()
       resetForm()
-
-      // refresh zones
-      window.api.admin.zones.getAll().then((zones) => {
-        setZonesList(zones)
-      })
-
+      window.api.admin.zones.getAll().then(setZonesList)
       setKhda('')
-      setFormError('✅ Transaction saved!')
+      toast.success('✅ معاملہ کامیابی سے محفوظ ہو گیا!')
     } catch (err) {
       console.error('Transaction creation failed:', err)
       setFormError(err.message || 'معاملہ محفوظ کرنے میں ناکامی')
+      toast.error(err.message || 'معاملہ محفوظ کرنے میں ناکامی')
     }
   }
 
@@ -515,6 +508,7 @@ export default function CreateTransactionForm() {
           {formError}
         </div>
       )}
+      <ToastContainer position="top-right" autoClose={3000} />
 
       <form key={formKey} onSubmit={handleSubmit} className="transaction-form">
         <div className="form-section">
@@ -522,7 +516,7 @@ export default function CreateTransactionForm() {
           <input
             id="date"
             type="date"
-            value={date || ``}
+            value={date || ''}
             onChange={(e) => setDate(e.target.value)}
             className="form-input"
           />
@@ -558,7 +552,6 @@ export default function CreateTransactionForm() {
             ))}
           </select>
 
-          {/* Manual book input when needed */}
           <label>کتاب نمبر:</label>
           <select
             value={selectedBookNumber}
@@ -578,7 +571,7 @@ export default function CreateTransactionForm() {
             id="starting"
             className="form-input"
             placeholder="ابتدائی نمبر"
-            value={starting ?? ``}
+            value={starting ?? ''}
             onChange={(e) => setStarting(e.target.value)}
             type="number"
             dir="ltr"
@@ -591,7 +584,7 @@ export default function CreateTransactionForm() {
             id="ending"
             className="form-input"
             placeholder="اختتامی نمبر"
-            value={ending ?? ``}
+            value={ending ?? ''}
             onChange={(e) => setEnding(e.target.value)}
             type="number"
             dir="ltr"
@@ -603,8 +596,8 @@ export default function CreateTransactionForm() {
             id="total"
             className="form-input"
             placeholder="کل ٹرالیاں"
-            value={total ?? ``}
-            readOnly // ← auto-calculated
+            value={total ?? ''}
+            readOnly
             type="number"
             dir="ltr"
             onWheel={(e) => e.target.blur()}
@@ -622,7 +615,7 @@ export default function CreateTransactionForm() {
             className="form-input"
             type="number"
             placeholder="کل آمدن"
-            value={kulAmdan ?? ``}
+            value={kulAmdan ?? ''}
             onChange={(e) => setKulAmdan(e.target.value)}
             dir="ltr"
             onWheel={(e) => e.target.blur()}
@@ -634,10 +627,9 @@ export default function CreateTransactionForm() {
             className="form-input"
             type="number"
             placeholder="کل اخراجات"
-            value={kulAkhrajat ?? ``}
-            onChange={(e) => setKulAkhrajat(e.target.value)}
+            value={kulAkhrajat ?? ''}
+            readOnly
             dir="ltr"
-            onWheel={(e) => e.target.blur()}
           />
 
           <label htmlFor="saafiAmdan">صافی آمدن:</label>
@@ -646,8 +638,8 @@ export default function CreateTransactionForm() {
             className="form-input"
             type="number"
             placeholder="صافی آمدن"
-            value={saafiAmdan ?? ``}
-            readOnly // 🔒 Auto-calculated
+            value={saafiAmdan ?? ''}
+            readOnly
             dir="ltr"
           />
 
@@ -657,7 +649,7 @@ export default function CreateTransactionForm() {
             className="form-input"
             type="number"
             placeholder="ایکسایز"
-            value={exercise ?? ``}
+            value={exercise ?? ''}
             onChange={(e) => setExercise(e.target.value)}
             dir="ltr"
             onWheel={(e) => e.target.blur()}
@@ -669,8 +661,8 @@ export default function CreateTransactionForm() {
             className="form-input"
             type="number"
             placeholder="کل میزان"
-            value={kulMaizan ?? ``}
-            readOnly // 🔒 Auto-calculated
+            value={kulMaizan ?? ''}
+            readOnly
             dir="ltr"
           />
         </div>
@@ -691,7 +683,7 @@ export default function CreateTransactionForm() {
                     <div className="akhrajat-title">
                       <select
                         className="form-select akhrajat-title"
-                        value={item.title || ``}
+                        value={item.title || ''}
                         onChange={(e) => updateAkhrajat(index, 'title', e.target.value)}
                       >
                         <option value="">-- عنوان منتخب کریں --</option>
@@ -708,7 +700,7 @@ export default function CreateTransactionForm() {
                           activeInput === `akhrajat-desc-${index}` ? 'active-input' : ''
                         }`}
                         placeholder="تفصیل"
-                        value={item.description || ``}
+                        value={item.description || ''}
                         onChange={(e) => updateAkhrajat(index, 'description', e.target.value)}
                         onFocus={() => handleInputFocus(`akhrajat-desc-${index}`)}
                         ref={(el) => {
@@ -719,13 +711,11 @@ export default function CreateTransactionForm() {
                         className="form-input akhrajat-amount"
                         placeholder="رقم"
                         type="number"
-                        value={item.amount ?? ``}
+                        value={item.amount ?? ''}
                         onChange={(e) => updateAkhrajat(index, 'amount', e.target.value)}
                         dir="ltr"
                         onWheel={(e) => e.target.blur()}
                       />
-
-                      {/* ================= GARI SUB-FIELDS ================= */}
                       {isGari && (
                         <div className="gari-expense-section">
                           <label>گاڑی خرچ کی قسم:</label>
@@ -750,7 +740,6 @@ export default function CreateTransactionForm() {
                               </option>
                             ))}
                           </select>
-
                           {['پٹرول', 'ڈیزل'].includes(item.gariExpenses?.[0]?.title) && (
                             <input
                               type="number"
@@ -764,7 +753,6 @@ export default function CreateTransactionForm() {
                               }}
                             />
                           )}
-
                           {item.gariExpenses?.[0]?.title === 'مرمت' && (
                             <select
                               className="form-select"
@@ -785,8 +773,6 @@ export default function CreateTransactionForm() {
                           )}
                         </div>
                       )}
-
-                      {/* ================= OTHER (MUTAFARIK) SUB-FIELDS ================= */}
                       {isOther && (
                         <div className="other-expense-section">
                           <label>متفرق ذیلی عنوان:</label>
@@ -814,8 +800,6 @@ export default function CreateTransactionForm() {
                             ))}
                             <option value="__new__">+ نیا متفرق عنوان</option>
                           </select>
-
-                          {/* show input when creating a new Other subtype */}
                           {item.othersTitlesId == null && (
                             <input
                               type="text"
@@ -854,7 +838,6 @@ export default function CreateTransactionForm() {
         </div>
       </form>
 
-      {/* Urdu keyboard toggle */}
       <button
         type="button"
         className="keyboard-toggle"

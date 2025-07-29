@@ -5,6 +5,8 @@ import './AdminPanel.css'
 import { useNavigate } from 'react-router-dom'
 import { LogoutButton } from './logout'
 import UrduKeyboard from './UrduKeyboard'
+import { ToastContainer, toast } from 'react-toastify'
+import 'react-toastify/dist/ReactToastify.css'
 
 /** Change this if your Mutafarik display text differs. */
 const MUTAFARIK_LABEL = 'متفرق' // must match AkhrajatTitle.name in DB
@@ -18,7 +20,7 @@ export default function AdminPanel() {
   const [gariTitles, setGariTitles] = useState([])
   const [gariExpenseTypes, setGariExpenseTypes] = useState([])
   const [gariParts, setGariParts] = useState([])
-  const [othersTitles, setOthersTitles] = useState([]) // NEW
+  const [othersTitles, setOthersTitles] = useState([])
 
   /* ========================= Keyboard State ========================= */
   const [showKeyboard, setShowKeyboard] = useState(false)
@@ -38,13 +40,14 @@ export default function AdminPanel() {
   const [newGariPart, setNewGariPart] = useState('')
 
   /* ========================= OthersTitles Create ========================= */
-  const [newOtherTitle, setNewOtherTitle] = useState('') // NEW
+  const [newOtherTitle, setNewOtherTitle] = useState('')
 
   /* ========================= Active-Book Registration ========================= */
   const [regZone, setRegZone] = useState('')
   const [regKhda, setRegKhda] = useState('')
   const [newBookNumber, setNewBookNumber] = useState('')
   const [activeBooks, setActiveBooks] = useState([])
+  const [pendingDeleteBook, setPendingDeleteBook] = useState(null)
 
   /* ========================= Editing State ========================= */
   const [editingZone, setEditingZone] = useState(null)
@@ -66,8 +69,8 @@ export default function AdminPanel() {
   const [editingGariPart, setEditingGariPart] = useState(null)
   const [editingGariPartName, setEditingGariPartName] = useState('')
 
-  const [editingOtherTitle, setEditingOtherTitle] = useState(null) // NEW
-  const [editingOtherTitleName, setEditingOtherTitleName] = useState('') // NEW
+  const [editingOtherTitle, setEditingOtherTitle] = useState(null)
+  const [editingOtherTitleName, setEditingOtherTitleName] = useState('')
 
   /* ===================================================================
    * Keyboard Helpers
@@ -92,7 +95,7 @@ export default function AdminPanel() {
       case 'newGariPart':
         setNewGariPart(updater(newGariPart))
         break
-      case 'newOtherTitle': // NEW
+      case 'newOtherTitle':
         setNewOtherTitle(updater(newOtherTitle))
         break
       default:
@@ -138,25 +141,24 @@ export default function AdminPanel() {
    * Load All Admin Data
    * ================================================================= */
   const loadData = async () => {
-    const [z, t, gt, et, gp, ot] = await Promise.all([
-      window.api.admin.zones.getAll(),
-      window.api.admin.akhrajatTitles.getAll(),
-      window.api.admin.gariTitles.getAll(),
-      window.api.admin.gariExpenseTypes.getAll(),
-      window.api.admin.gariParts.getAll(),
-      window.api.admin.othersTitles.getAll()
-    ])
-    setZones(z)
-    setTitles(t)
-    setGariTitles(gt)
-    setGariExpenseTypes(et)
-    setGariParts(gp)
-    setOthersTitles(ot)
-
-    // if a zone+khda already selected, refresh activeBooks
-    if (regZone && regKhda) {
-      const ab = await window.api.transactions.getActiveBookByZone(regZone, regKhda)
-      setActiveBooks(ab)
+    try {
+      const [z, t, gt, et, gp, ot] = await Promise.all([
+        window.api.admin.zones.getAll(),
+        window.api.admin.akhrajatTitles.getAll(),
+        window.api.admin.gariTitles.getAll(),
+        window.api.admin.gariExpenseTypes.getAll(),
+        window.api.admin.gariParts.getAll(),
+        window.api.admin.othersTitles.getAll()
+      ])
+      setZones(z)
+      setTitles(t)
+      setGariTitles(gt)
+      setGariExpenseTypes(et)
+      setGariParts(gp)
+      setOthersTitles(ot)
+    } catch (err) {
+      console.error('Error loading admin data:', err)
+      toast.error('ڈیٹا لوڈ کرنے میں ناکامی')
     }
   }
 
@@ -169,27 +171,45 @@ export default function AdminPanel() {
    * ================================================================= */
   const addZone = async () => {
     if (newZone.trim()) {
-      await window.api.admin.zones.create(newZone.trim())
-      setNewZone('')
-      loadData()
+      try {
+        await window.api.admin.zones.create(newZone.trim())
+        setNewZone('')
+        loadData()
+        toast.success('زون کامیابی سے شامل ہو گیا')
+      } catch (err) {
+        console.error('Add Zone Error:', err)
+        toast.error('زون شامل کرنے میں ناکامی')
+      }
     }
   }
 
   const updateZone = async () => {
     if (editingZone && editingZoneName.trim()) {
-      await window.api.admin.zones.update({
-        id: editingZone,
-        name: editingZoneName.trim()
-      })
-      setEditingZone(null)
-      setEditingZoneName('')
-      loadData()
+      try {
+        await window.api.admin.zones.update({
+          id: editingZone,
+          name: editingZoneName.trim()
+        })
+        setEditingZone(null)
+        setEditingZoneName('')
+        loadData()
+        toast.success('زون کامیابی سے اپ ڈیٹ ہو گیا')
+      } catch (err) {
+        console.error('Update Zone Error:', err)
+        toast.error('زون اپ ڈیٹ کرنے میں ناکامی')
+      }
     }
   }
 
   const deleteZone = async (id) => {
-    await window.api.admin.zones.delete(id)
-    loadData()
+    try {
+      await window.api.admin.zones.delete(id)
+      loadData()
+      toast.success('زون کامیابی سے حذف ہو گیا')
+    } catch (err) {
+      console.error('Delete Zone Error:', err)
+      toast.error('زون حذف کرنے میں ناکامی')
+    }
   }
 
   /* ===================================================================
@@ -197,36 +217,56 @@ export default function AdminPanel() {
    * ================================================================= */
   const addKhda = async () => {
     if (newKhda.trim() && selectedZoneForKhda) {
-      await window.api.admin.khdas.create({
-        name: newKhda.trim(),
-        zoneId: selectedZoneForKhda
-      })
-      setNewKhda('')
-      setSelectedZoneForKhda('')
-      loadData()
+      try {
+        await window.api.admin.khdas.create({
+          name: newKhda.trim(),
+          zoneId: selectedZoneForKhda
+        })
+        setNewKhda('')
+        setSelectedZoneForKhda('')
+        loadData()
+        toast.success('کھدہ کامیابی سے شامل ہو گیا')
+      } catch (err) {
+        console.error('Add Khda Error:', err)
+        toast.error('کھدہ شامل کرنے میں ناکامی')
+      }
     }
   }
 
   const updateKhda = async () => {
     if (editingKhda && editingKhdaName.trim()) {
-      await window.api.admin.khdas.update({
-        id: editingKhda,
-        name: editingKhdaName.trim(),
-        zoneId: editingKhdaZoneId
-      })
-      setEditingKhda(null)
-      setEditingKhdaName('')
-      setEditingKhdaZoneId('')
-      loadData()
+      try {
+        await window.api.admin.khdas.update({
+          id: editingKhda,
+          name: editingKhdaName.trim(),
+          zoneId: editingKhdaZoneId
+        })
+        setEditingKhda(null)
+        setEditingKhdaName('')
+        setEditingKhdaZoneId('')
+        loadData()
+        toast.success('کھدہ کامیابی سے اپ ڈیٹ ہو گیا')
+      } catch (err) {
+        console.error('Update Khda Error:', err)
+        toast.error('کھدہ اپ ڈیٹ کرنے میں ناکامی')
+      }
     }
   }
 
   const deleteKhda = async (id) => {
-    await window.api.admin.khdas.delete(id)
-    loadData()
+    try {
+      await window.api.admin.khdas.delete(id)
+      loadData()
+      toast.success('کھدہ کامیابی سے حذف ہو گیا')
+    } catch (err) {
+      console.error('Delete Khda Error:', err)
+      toast.error('کھدہ حذف کرنے میں ناکامی')
+    }
   }
 
-  //Active Book CRUD
+  /* ===================================================================
+   * Active Book CRUD
+   * ================================================================= */
   const handleRegZoneChange = async (e) => {
     const zone = e.target.value
     setRegZone(zone)
@@ -238,8 +278,13 @@ export default function AdminPanel() {
     const khda = e.target.value
     setRegKhda(khda)
     if (regZone && khda) {
-      const ab = await window.api.transactions.getActiveBookByZone(regZone, khda)
-      setActiveBooks(ab)
+      try {
+        const ab = await window.api.transactions.getActiveBookByZone(regZone, khda)
+        setActiveBooks(ab)
+      } catch (err) {
+        console.error('Get Active Books Error:', err)
+        toast.error('فعال کتابیں لوڈ کرنے میں ناکامی')
+      }
     }
   }
 
@@ -249,11 +294,28 @@ export default function AdminPanel() {
     try {
       await window.api.transactions.registerActiveBook(regZone, regKhda, Number(newBookNumber))
       setNewBookNumber('')
-      // reload active books list
       const ab = await window.api.transactions.getActiveBookByZone(regZone, regKhda)
       setActiveBooks(ab)
+      toast.success('کتاب کامیابی سے رجسٹر ہو گئی')
     } catch (err) {
-      alert(err.message)
+      console.error('Register Book Error:', err)
+      toast.error(`کتاب رجسٹر کرنے میں ناکامی: ${err.message}`)
+    }
+  }
+
+  const deleteActiveBook = async (bookId) => {
+    try {
+      const response = await window.api.transactions.deleteActiveBook(bookId)
+      setPendingDeleteBook(null)
+      await loadData()
+      if (regZone && regKhda) {
+        const ab = await window.api.transactions.getActiveBookByZone(regZone, regKhda)
+        setActiveBooks(ab)
+      }
+      toast.success(response.message || 'کتاب کامیابی سے حذف ہو گئی')
+    } catch (err) {
+      console.error('Delete Active Book Error:', err)
+      toast.error(`کتاب حذف کرنے میں ناکامی: ${err.message}`)
     }
   }
 
@@ -262,94 +324,148 @@ export default function AdminPanel() {
    * ================================================================= */
   const addTitle = async () => {
     if (newTitle.trim()) {
-      await window.api.admin.akhrajatTitles.create(newTitle.trim())
-      setNewTitle('')
-      loadData()
+      try {
+        await window.api.admin.akhrajatTitles.create(newTitle.trim())
+        setNewTitle('')
+        loadData()
+        toast.success('عنوان کامیابی سے شامل ہو گیا')
+      } catch (err) {
+        console.error('Add Title Error:', err)
+        toast.error('عنوان شامل کرنے میں ناکامی')
+      }
     }
   }
 
   const updateTitle = async () => {
     if (editingTitle && editingTitleName.trim()) {
-      await window.api.admin.akhrajatTitles.update({
-        id: editingTitle,
-        name: editingTitleName.trim()
-      })
-      setEditingTitle(null)
-      setEditingTitleName('')
-      loadData()
+      try {
+        await window.api.admin.akhrajatTitles.update({
+          id: editingTitle,
+          name: editingTitleName.trim()
+        })
+        setEditingTitle(null)
+        setEditingTitleName('')
+        loadData()
+        toast.success('عنوان کامیابی سے اپ ڈیٹ ہو گیا')
+      } catch (err) {
+        console.error('Update Title Error:', err)
+        toast.error('عنوان اپ ڈیٹ کرنے میں ناکامی')
+      }
     }
   }
 
   const deleteTitle = async (id) => {
-    await window.api.admin.akhrajatTitles.delete(id)
-    loadData()
+    try {
+      await window.api.admin.akhrajatTitles.delete(id)
+      loadData()
+      toast.success('عنوان کامیابی سے حذف ہو گیا')
+    } catch (err) {
+      console.error('Delete Title Error:', err)
+      toast.error('عنوان حذف کرنے میں ناکامی')
+    }
   }
 
   /* ===================================================================
    * Gari Titles CRUD
    * ================================================================= */
   const saveGariTitleEdit = async (gariId) => {
-    await window.api.admin.gariTitles.update({
-      id: gariId,
-      name: editingGariTitleName
-    })
-    setEditingGariTitle(null)
-    setEditingGariTitleName('')
-    loadData()
+    try {
+      await window.api.admin.gariTitles.update({
+        id: gariId,
+        name: editingGariTitleName
+      })
+      setEditingGariTitle(null)
+      setEditingGariTitleName('')
+      loadData()
+      toast.success('گاڑی کا عنوان کامیابی سے اپ ڈیٹ ہو گیا')
+    } catch (err) {
+      console.error('Update Gari Title Error:', err)
+      toast.error('گاڑی کا عنوان اپ ڈیٹ کرنے میں ناکامی')
+    }
   }
 
   /* ===================================================================
    * Gari Expense Types CRUD
    * ================================================================= */
   const saveExpenseTypeEdit = async (id) => {
-    await window.api.admin.gariExpenseTypes.update({
-      id,
-      name: editingExpenseTypeName
-    })
-    setEditingExpenseType(null)
-    setEditingExpenseTypeName('')
-    loadData()
+    try {
+      await window.api.admin.gariExpenseTypes.update({
+        id,
+        name: editingExpenseTypeName
+      })
+      setEditingExpenseType(null)
+      setEditingExpenseTypeName('')
+      loadData()
+      toast.success('اخراجات کی قسم کامیابی سے اپ ڈیٹ ہو گئی')
+    } catch (err) {
+      console.error('Update Expense Type Error:', err)
+      toast.error('اخراجات کی قسم اپ ڈیٹ کرنے میں ناکامی')
+    }
   }
 
   /* ===================================================================
    * Gari Parts CRUD
    * ================================================================= */
   const saveGariPartEdit = async (id) => {
-    await window.api.admin.gariParts.update({
-      id,
-      name: editingGariPartName
-    })
-    setEditingGariPart(null)
-    setEditingGariPartName('')
-    loadData()
+    try {
+      await window.api.admin.gariParts.update({
+        id,
+        name: editingGariPartName
+      })
+      setEditingGariPart(null)
+      setEditingGariPartName('')
+      loadData()
+      toast.success('گاڑی کا پرزہ کامیابی سے اپ ڈیٹ ہو گیا')
+    } catch (err) {
+      console.error('Update Gari Part Error:', err)
+      toast.error('گاڑی کا پرزہ اپ ڈیٹ کرنے میں ناکامی')
+    }
   }
 
   /* ===================================================================
-   * OthersTitles CRUD (NEW)
+   * OthersTitles CRUD
    * ================================================================= */
   const addOtherTitle = async () => {
     if (newOtherTitle.trim()) {
-      await window.api.admin.othersTitles.create(newOtherTitle.trim())
-      setNewOtherTitle('')
-      loadData()
+      try {
+        await window.api.admin.othersTitles.create(newOtherTitle.trim())
+        setNewOtherTitle('')
+        loadData()
+        toast.success('متفرق عنوان کامیابی سے شامل ہو گیا')
+      } catch (err) {
+        console.error('Add Other Title Error:', err)
+        toast.error('متفرق عنوان شامل کرنے میں ناکامی')
+      }
     }
   }
 
   const updateOtherTitle = async () => {
     if (editingOtherTitle && editingOtherTitleName.trim()) {
-      await window.api.admin.othersTitles.update({
-        id: editingOtherTitle,
-        name: editingOtherTitleName.trim()
-      })
-      setEditingOtherTitle(null)
-      setEditingOtherTitleName('')
-      loadData()
+      try {
+        await window.api.admin.othersTitles.update({
+          id: editingOtherTitle,
+          name: editingOtherTitleName.trim()
+        })
+        setEditingOtherTitle(null)
+        setEditingOtherTitleName('')
+        loadData()
+        toast.success('متفرق عنوان کامیابی سے اپ ڈیٹ ہو گیا')
+      } catch (err) {
+        console.error('Update Other Title Error:', err)
+        toast.error('متفرق عنوان اپ ڈیٹ کرنے میں ناکامی')
+      }
     }
   }
 
   const deleteOtherTitle = async (id) => {
-    await window.api.admin.othersTitles.delete(id)
-    loadData()
+    try {
+      await window.api.admin.othersTitles.delete(id)
+      loadData()
+      toast.success('متفرق عنوان کامیابی سے حذف ہو گیا')
+    } catch (err) {
+      console.error('Delete Other Title Error:', err)
+      toast.error('متفرق عنوان حذف کرنے میں ناکامی')
+    }
   }
 
   /* ===================================================================
@@ -357,6 +473,7 @@ export default function AdminPanel() {
    * ================================================================= */
   return (
     <div className="container">
+      <ToastContainer position="top-right" autoClose={3000} />
       <button type="button" className="return-btn" onClick={() => navigate('/')}>
         ⬅️ واپس جائیں
       </button>
@@ -414,13 +531,43 @@ export default function AdminPanel() {
         {activeBooks.length > 0 && (
           <ul className="title-list">
             {activeBooks.map((ab) => (
-              <li key={ab.id}>
+              <li key={ab.id} className="title-item">
                 کتاب نمبر {ab.bookNumber} — استعمال شدہ ٹکٹ: {ab.usedTickets}
+                {ab.usedTickets === 0 && (
+                  <div className="button-group">
+                    <button onClick={() => setPendingDeleteBook(ab.id)} className="button-delete">
+                      حذف
+                    </button>
+                  </div>
+                )}
               </li>
             ))}
           </ul>
         )}
       </div>
+
+      {/* Delete Active Book Confirmation Modal */}
+      {pendingDeleteBook && (
+        <div className="modal">
+          <div className="modal-content">
+            <div className="modal-icon">🗑️</div>
+            <h3>حذف کی تصدیق</h3>
+            <p>کیا آپ واقعی اس کتاب کو حذف کرنا چاہتے ہیں؟</p>
+            <div className="modal-buttons">
+              <button
+                className="confirm-delete-button"
+                onClick={() => deleteActiveBook(pendingDeleteBook)}
+              >
+                ✅ تصدیق کریں
+              </button>
+              <button className="cancel-modal-button" onClick={() => setPendingDeleteBook(null)}>
+                ❌ منسوخ کریں
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ================================================================
        * Zones + Khda tree
        * ============================================================== */}

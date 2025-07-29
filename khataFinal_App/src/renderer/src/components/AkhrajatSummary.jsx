@@ -100,14 +100,6 @@ export default function AkhrajatSummary() {
           </select>
         </label>
         <label>
-          کتاب نمبر:
-          <input
-            type="text"
-            value={filterBookNumber}
-            onChange={(e) => setFilterBookNumber(e.target.value)}
-          />
-        </label>
-        <label>
           اخراجات عنوان:
           <select value={filterTitle} onChange={(e) => setFilterTitle(e.target.value)}>
             <option value="">تمام</option>

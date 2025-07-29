@@ -93,16 +93,6 @@ export default function TrollySummary() {
             ))}
           </select>
         </label>
-
-        <label>
-          کتاب نمبر:
-          <input
-            type="text"
-            value={filterBookNumber}
-            onChange={(e) => setFilterBookNumber(e.target.value)}
-          />
-        </label>
-
         <label>
           شروع تاریخ:
           <input

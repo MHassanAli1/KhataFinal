@@ -1,4 +1,3 @@
-// src/main/ipc/transactionHandlers.js
 import { PrismaClient } from '@prisma/client'
 const prisma = new PrismaClient()
 
@@ -8,7 +7,6 @@ const isUrdu = (text) => /^[\u0600-\u06FF\s]+$/.test(text || '')
 const MAX_TICKETS_PER_BOOK = 100
 
 async function resolveOthersTitlesId(nameOrId) {
-  // if numeric id passed directly
   if (typeof nameOrId === 'number' && !Number.isNaN(nameOrId)) {
     const found = await prisma.othersTitles.findUnique({ where: { id: nameOrId } })
     return found ? found.id : null
@@ -16,10 +14,8 @@ async function resolveOthersTitlesId(nameOrId) {
   if (typeof nameOrId === 'string') {
     const nm = nameOrId.trim()
     if (!nm) return null
-    // try find
     const found = await prisma.othersTitles.findUnique({ where: { name: nm } })
     if (found) return found.id
-    // auto-create if not found
     const created = await prisma.othersTitles.create({ data: { name: nm } })
     return created.id
   }
@@ -48,7 +44,6 @@ const transactionHandlers = (ipcMain) => {
         akhrajat = []
       } = data ?? {}
 
-      // Basic Validation
       if (!isUrdu(ZoneName) || !isUrdu(KhdaName)) {
         throw new Error('زون اور کھدہ کا نام صرف اردو میں ہونا چاہیے۔')
       }
@@ -58,7 +53,6 @@ const transactionHandlers = (ipcMain) => {
         throw new Error('کل ٹکٹ کی تعداد درست نہیں۔')
       }
 
-      // Step 1: Find Active Book
       const activeBook = await prisma.activeBook.findFirst({
         where: {
           zoneName: ZoneName,
@@ -90,7 +84,6 @@ const transactionHandlers = (ipcMain) => {
         throw new Error(`اختتامی نمبر کتاب کی حد ${maxTicketInBook} سے زیادہ نہیں ہو سکتا۔`)
       }
 
-      // Step 2: Process Akhrajat Entries
       const dbTitles = await prisma.akhrajatTitle.findMany({ select: { name: true, isGari: true } })
       const titleMap = new Map(dbTitles.map((t) => [t.name, t.isGari]))
       const akhrajatCreateData = []
@@ -170,7 +163,6 @@ const transactionHandlers = (ipcMain) => {
         akhrajatCreateData.push(base)
       }
 
-      // Step 3: Create Transaction
       const transaction = await prisma.transaction.create({
         data: {
           userID,
@@ -204,13 +196,11 @@ const transactionHandlers = (ipcMain) => {
         }
       })
 
-      // Step 4: Update Active Book usage
-      const updatedUsed = used + Number(totalTickets)
       await prisma.activeBook.update({
         where: { id: activeBook.id },
         data: {
-          usedTickets: updatedUsed,
-          isActive: updatedUsed >= maxTickets ? false : true
+          usedTickets: used + Number(totalTickets),
+          isActive: used + Number(totalTickets) >= maxTickets ? false : true
         }
       })
 
@@ -225,13 +215,38 @@ const transactionHandlers = (ipcMain) => {
   /* ===================================================================
    * GET ALL
    * ================================================================= */
-  ipcMain.handle('transactions:getAll', async () => {
+  ipcMain.handle('transactions:getAll', async (_event, filters = {}) => {
     try {
+      const { zoneName, khdaName, bookNumber, dateFrom, dateTo } = filters
+
+      const where = {
+        ...(zoneName ? { ZoneName: { contains: zoneName, mode: 'insensitive' } } : {}),
+        ...(khdaName ? { KhdaName: { contains: khdaName, mode: 'insensitive' } } : {}),
+        ...(bookNumber
+          ? {
+              trollies: {
+                some: { bookNumber: Number(bookNumber) }
+              }
+            }
+          : {}),
+        ...(dateFrom || dateTo
+          ? {
+              date: {
+                ...(dateFrom ? { gte: new Date(dateFrom) } : {}),
+                ...(dateTo ? { lte: new Date(dateTo) } : {})
+              }
+            }
+          : {})
+      }
+
       return await prisma.transaction.findMany({
+        where,
         include: {
           trollies: true,
-          akhrajat: { include: { gariExpense: true } }
-        }
+          akhrajat: { include: { gariExpense: true } },
+          activeBook: true
+        },
+        orderBy: { date: 'desc' }
       })
     } catch (err) {
       console.error('Get All Error:', err)
@@ -250,14 +265,14 @@ const transactionHandlers = (ipcMain) => {
       where: { id: txId },
       include: {
         trollies: true,
-        akhrajat: { include: { gariExpense: true } }
+        akhrajat: { include: { gariExpense: true } },
+        activeBook: true
       }
     })
   })
 
   /* ===================================================================
    * UPDATE
-   *  (bookNumber NOT re-counting tickets; does minimal safety check)
    * ================================================================= */
   ipcMain.handle('transactions:update', async (_event, { id, ...data }) => {
     try {
@@ -275,7 +290,6 @@ const transactionHandlers = (ipcMain) => {
 
       let bookNumberToSet
       if (bookNumber) {
-        // Ensure book reserved for same khda
         const usedBook = await prisma.usedBookNumber.findUnique({
           where: { number: bookNumber }
         })
@@ -294,7 +308,6 @@ const transactionHandlers = (ipcMain) => {
             )
           }
         } else {
-          // reserve it now
           await prisma.usedBookNumber.create({
             data: { number: bookNumber, khdaName: existingTransaction.KhdaName }
           })
@@ -315,7 +328,6 @@ const transactionHandlers = (ipcMain) => {
           Exercise: data.Exercise ? BigInt(data.Exercise) : undefined,
           date: date ? new Date(date) : undefined,
           bookNumber: bookNumberToSet
-          // ticketNumber deliberately unchanged
         }
       })
 
@@ -330,29 +342,91 @@ const transactionHandlers = (ipcMain) => {
   /* ===================================================================
    * DELETE (single)
    * ================================================================= */
-  ipcMain.handle('transactions:delete', async (_event, id) => {
-    try {
-      const parsedId = parseInt(id, 10)
-      if (isNaN(parsedId)) throw new Error('Invalid ID')
+  ipcMain.handle('transactions:delete', async (_event, txIdArg) => {
+    const txId = parseInt(txIdArg, 10)
+    if (isNaN(txId)) throw new Error('Invalid transaction ID')
 
-      const transaction = await prisma.transaction.findUnique({
-        where: { id: parsedId }
+    const tx = await prisma.transaction.findUnique({
+      where: { id: txId },
+      include: { trollies: { take: 1 }, activeBook: true }
+    })
+    if (!tx) throw new Error('Transaction not found')
+
+    const trolly = tx.trollies[0]
+    const ab = tx.activeBook
+    if (!trolly || !ab) throw new Error('Malformed data')
+
+    const allT = await prisma.trolly.findMany({ where: { bookNumber: trolly.bookNumber } })
+    const toRemove = allT.filter((t) => t.StartingNum >= trolly.StartingNum)
+    const removeCount = toRemove.length
+
+    if (!ab.isActive || ab.usedTickets >= MAX_TICKETS_PER_BOOK) {
+      const allTx = await prisma.transaction.findMany({ where: { activeBookId: ab.id } })
+      const allIds = allTx.map((t) => t.id)
+
+      await prisma.deletedTransaction.createMany({
+        data: allIds.map((id) => ({ transactionId: id }))
       })
-      if (!transaction) throw new Error('Transaction not found')
+      await prisma.akhrajat.deleteMany({ where: { transactionId: { in: allIds } } })
+      await prisma.trolly.deleteMany({ where: { activeBookId: ab.id } })
+      await prisma.transaction.deleteMany({ where: { activeBookId: ab.id } })
+      await prisma.activeBook.delete({ where: { id: ab.id } })
 
-      await prisma.deletedTransaction.create({
-        data: { transactionId: parsedId }
-      })
-
-      await prisma.akhrajat.deleteMany({ where: { transactionId: parsedId } })
-      await prisma.trolly.deleteMany({ where: { transactionId: parsedId } })
-      await prisma.transaction.delete({ where: { id: parsedId } })
-
-      return { message: `ٹرانزیکشن حذف کر دیا گیا۔` }
-    } catch (err) {
-      console.error('Delete Error:', err)
-      throw new Error(err.message || 'Failed to delete transaction')
+      return { message: `کتاب نمبر ${trolly.bookNumber} پوری طرح حذف کر دی گئی۔` }
     }
+
+    const txnsToDel = await prisma.transaction.findMany({
+      where: { trollies: { some: { id: { in: toRemove.map((t) => t.id) } } } }
+    })
+    const txIds = txnsToDel.map((t) => t.id)
+
+    await prisma.deletedTransaction.createMany({
+      data: txIds.map((id) => ({ transactionId: id }))
+    })
+    await prisma.akhrajat.deleteMany({ where: { transactionId: { in: txIds } } })
+    await prisma.trolly.deleteMany({ where: { id: { in: toRemove.map((t) => t.id) } } })
+    await prisma.transaction.deleteMany({ where: { id: { in: txIds } } })
+
+    await prisma.activeBook.update({
+      where: { id: ab.id },
+      data: { usedTickets: ab.usedTickets - removeCount }
+    })
+
+    const highest = allT[allT.length - 1].EndingNum
+    return { message: `ٹرالی ${trolly.StartingNum} سے ${highest} تک حذف کر دی گئیں۔` }
+  })
+
+  /* ===================================================================
+   * DELETE FROM TROLLEY (cascade forward)
+   * ================================================================= */
+  ipcMain.handle('transactions:deleteFromTrolly', async (_event, trollyIdArg) => {
+    const trollyId = parseInt(trollyIdArg, 10)
+    if (isNaN(trollyId)) throw new Error('Invalid trolley ID')
+
+    const startT = await prisma.trolly.findUnique({ where: { id: trollyId } })
+    if (!startT) throw new Error('Trolley not found')
+
+    const all = await prisma.trolly.findMany({ where: { bookNumber: startT.bookNumber } })
+    const toRemove = all.filter((t) => t.StartingNum >= startT.StartingNum)
+    if (!toRemove.length) throw new Error('کوئی ٹرالی حذف کرنے کے لیے نہیں ملی۔')
+
+    const ab = await prisma.activeBook.findFirst({ where: { bookNumber: startT.bookNumber } })
+    if (!ab) throw new Error('ActiveBook not found')
+
+    const txIds = toRemove.map((t) => t.transactionId)
+    await prisma.deletedTransaction.createMany({
+      data: txIds.map((id) => ({ transactionId: id }))
+    })
+    await prisma.akhrajat.deleteMany({ where: { transactionId: { in: txIds } } })
+    await prisma.trolly.deleteMany({ where: { id: { in: toRemove.map((t) => t.id) } } })
+    await prisma.transaction.deleteMany({ where: { id: { in: txIds } } })
+
+    await prisma.activeBook.update({
+      where: { id: ab.id },
+      data: { usedTickets: ab.usedTickets - toRemove.length }
+    })
+
+    return { message: `ٹرالی نمبر ${startT.StartingNum} سے آگے کی تمام ٹرالیاں حذف کر دی گئیں۔` }
   })
 
   /* ===================================================================
@@ -360,55 +434,37 @@ const transactionHandlers = (ipcMain) => {
    * ================================================================= */
   ipcMain.handle('transactions:deleteBookByNumber', async (_event, bookNumber) => {
     try {
-      const transactions = await prisma.transaction.findMany({ where: { bookNumber } })
-      const idsToDelete = transactions.map((t) => t.id)
+      const bookNum = parseInt(bookNumber, 10)
+      if (isNaN(bookNum)) throw new Error('غلط کتاب نمبر')
 
-      for (const tid of idsToDelete) {
-        await prisma.deletedTransaction.create({ data: { transactionId: tid } })
-      }
+      const activeBook = await prisma.activeBook.findFirst({
+        where: { bookNumber: bookNum },
+        include: { zone: true, khda: true }
+      })
+      if (!activeBook) throw new Error(`کتاب نمبر ${bookNum} نہیں ملی`)
 
-      await prisma.akhrajat.deleteMany({ where: { transactionId: { in: idsToDelete } } })
-      await prisma.trolly.deleteMany({ where: { transactionId: { in: idsToDelete } } })
-      await prisma.transaction.deleteMany({ where: { id: { in: idsToDelete } } })
-      await prisma.usedBookNumber.deleteMany({ where: { number: bookNumber } })
+      return await prisma.$transaction(async (prisma) => {
+        const trollies = await prisma.trolly.findMany({
+          where: { bookNumber: bookNum },
+          include: { transaction: true }
+        })
+        const transactionIds = trollies.map((t) => t.transactionId)
 
-      return { message: `پوری کتاب نمبر ${bookNumber} حذف کر دی گئی۔` }
+        await prisma.deletedTransaction.createMany({
+          data: transactionIds.map((txId) => ({ transactionId: txId }))
+        })
+
+        await prisma.akhrajat.deleteMany({ where: { transactionId: { in: transactionIds } } })
+        await prisma.trolly.deleteMany({ where: { bookNumber: bookNum } })
+        await prisma.transaction.deleteMany({ where: { id: { in: transactionIds } } })
+
+        await prisma.activeBook.delete({ where: { id: activeBook.id } })
+
+        return { message: `کتاب نمبر ${bookNum} پوری طرح حذف کر دی گئی۔` }
+      })
     } catch (err) {
       console.error('Delete Book Error:', err)
-      throw new Error(err.message || 'Failed to delete book')
-    }
-  })
-
-  /* ===================================================================
-   * DELETE FROM TICKET (cascade forward)
-   * ================================================================= */
-  ipcMain.handle('transactions:deleteFromTicket', async (_event, id) => {
-    try {
-      const parsedId = parseInt(id, 10)
-      if (isNaN(parsedId)) throw new Error('Invalid ID')
-
-      const transaction = await prisma.transaction.findUnique({ where: { id: parsedId } })
-      if (!transaction) throw new Error('Transaction not found')
-
-      const { bookNumber, ticketNumber } = transaction
-
-      const toDelete = await prisma.transaction.findMany({
-        where: { bookNumber, ticketNumber: { gte: ticketNumber } }
-      })
-      const idsToDelete = toDelete.map((t) => t.id)
-
-      for (const tid of idsToDelete) {
-        await prisma.deletedTransaction.create({ data: { transactionId: tid } })
-      }
-
-      await prisma.akhrajat.deleteMany({ where: { transactionId: { in: idsToDelete } } })
-      await prisma.trolly.deleteMany({ where: { transactionId: { in: idsToDelete } } })
-      await prisma.transaction.deleteMany({ where: { id: { in: idsToDelete } } })
-
-      return { message: `ٹکٹ نمبر ${ticketNumber} سے تمام حذف کر دیے گئے۔` }
-    } catch (err) {
-      console.error('Delete From Ticket Error:', err)
-      throw new Error('Failed to delete from ticket')
+      throw new Error(err.message || 'کتاب حذف کرنے میں ناکامی')
     }
   })
 
@@ -423,12 +479,14 @@ const transactionHandlers = (ipcMain) => {
         where: {
           OR: [
             { ZoneName: { contains: query, mode: 'insensitive' } },
-            { KhdaName: { contains: query, mode: 'insensitive' } }
+            { KhdaName: { contains: query, mode: 'insensitive' } },
+            { trollies: { some: { bookNumber: Number(query) } } }
           ]
         },
         include: {
           trollies: true,
-          akhrajat: { include: { gariExpense: true } }
+          akhrajat: { include: { gariExpense: true } },
+          activeBook: true
         }
       })
     } catch (err) {
@@ -446,7 +504,8 @@ const transactionHandlers = (ipcMain) => {
         where: { id },
         include: {
           trollies: true,
-          akhrajat: { include: { gariExpense: true } }
+          akhrajat: { include: { gariExpense: true } },
+          activeBook: true
         }
       })
       return transaction
@@ -458,20 +517,16 @@ const transactionHandlers = (ipcMain) => {
 
   /* ===================================================================
    * GET ALL BOOKS FOR A KHDA
-   *  - returns registered books + usage
-   *  - includes legacy books found in transactions but not registered
    * ================================================================= */
   ipcMain.handle('transactions:getBooksByKhda', async (_event, khdaName) => {
     try {
       if (!khdaName) return []
 
-      // Registered books
       const registered = await prisma.usedBookNumber.findMany({
-        where: { khdaName: khdaName },
+        where: { khdaName },
         select: { number: true }
       })
 
-      // Usage counts from transactions
       const grouped = await prisma.transaction.groupBy({
         by: ['bookNumber'],
         where: { KhdaName: khdaName },
@@ -488,8 +543,6 @@ const transactionHandlers = (ipcMain) => {
       })
 
       const books = []
-
-      // include all registered
       for (const r of registered) {
         const info = countMap.get(r.number)
         const used = info?.ticketsUsed ?? 0
@@ -503,7 +556,6 @@ const transactionHandlers = (ipcMain) => {
         })
       }
 
-      // include any *unregistered* legacy bookNumbers that have transactions
       for (const [num, info] of countMap.entries()) {
         if (!books.some((b) => b.bookNumber === num)) {
           const used = info.ticketsUsed
@@ -518,7 +570,6 @@ const transactionHandlers = (ipcMain) => {
         }
       }
 
-      // sort: non-full first, then latest use desc, then numeric/alpha
       books.sort((a, b) => {
         if (a.isFull !== b.isFull) return a.isFull ? 1 : -1
         if (a.lastTxDate && b.lastTxDate) {
@@ -537,8 +588,7 @@ const transactionHandlers = (ipcMain) => {
   })
 
   /* ===================================================================
-   * LATEST ACTIVE BOOK (legacy helper, 1 book)
-   * Returns: last used ticketNumber (renderer adds +1)
+   * LATEST ACTIVE BOOK
    * ================================================================= */
   ipcMain.handle('transactions:getLatestByKhda', async (_event, khdaName) => {
     try {
@@ -547,14 +597,13 @@ const transactionHandlers = (ipcMain) => {
       const latest = await prisma.transaction.findFirst({
         where: { KhdaName: khdaName },
         orderBy: { createdAt: 'desc' },
-        select: { bookNumber: true, ticketNumber: true }
+        include: { trollies: { select: { bookNumber: true } } }
       })
 
       if (!latest) return null
-      if (latest.ticketNumber >= MAX_TICKETS_PER_BOOK) return null
+      if (latest.trollies[0]?.bookNumber >= MAX_TICKETS_PER_BOOK) return null
 
-      // Return last ticket used; renderer will add +1
-      return latest
+      return { bookNumber: latest.trollies[0]?.bookNumber }
     } catch (err) {
       console.error('transactions:getLatestByKhda Error:', err)
       throw new Error('کھدہ کے لیے فعال کتاب حاصل کرنے میں ناکامی')
@@ -592,7 +641,10 @@ const transactionHandlers = (ipcMain) => {
       throw new Error('Failed to clear deleted transactions')
     }
   })
-  // 🔐 Register (or re-activate) an active book
+
+  /* ===================================================================
+   * REGISTER ACTIVE BOOK
+   * ================================================================= */
   ipcMain.handle(
     'transactions:registerActiveBook',
     async (_event, { zoneName, khdaName, bookNumber }) => {
@@ -600,7 +652,6 @@ const transactionHandlers = (ipcMain) => {
         throw new Error('زون، کھدہ اور کتاب نمبر درکار ہیں۔')
       }
 
-      // look for an *active* book with same zone + bookNumber
       const existing = await prisma.activeBook.findFirst({
         where: {
           zoneName,
@@ -615,11 +666,9 @@ const transactionHandlers = (ipcMain) => {
             `کتاب نمبر ${bookNumber} زون ${zoneName} میں پہلے سے ${existing.khdaName} کے لیے ایکٹو ہے۔`
           )
         }
-        // already active for this khda
         return existing
       }
 
-      // otherwise create a fresh activeBook
       const newActive = await prisma.activeBook.create({
         data: {
           zoneName,
@@ -634,7 +683,9 @@ const transactionHandlers = (ipcMain) => {
     }
   )
 
-  // 🔍 List all *active* (not full) books for a zone+khda
+  /* ===================================================================
+   * LIST ACTIVE BOOKS
+   * ================================================================= */
   ipcMain.handle('transactions:getActiveBookByZone', async (_event, { zoneName, khdaName }) => {
     if (!zoneName || !khdaName) return []
 
@@ -652,6 +703,121 @@ const transactionHandlers = (ipcMain) => {
       },
       orderBy: { bookNumber: 'asc' }
     })
+  })
+
+  /* ===================================================================
+   * DELETE A SINGLE TROLLEY
+   * ================================================================= */
+  ipcMain.handle('transactions:deleteTrolly', async (_event, trollyId) => {
+    try {
+      const tid = parseInt(trollyId, 10)
+      if (isNaN(tid)) throw new Error('غلط ٹرالی آئی ڈی')
+
+      const trolly = await prisma.trolly.findUnique({
+        where: { id: tid },
+        include: {
+          transaction: {
+            include: { activeBook: true }
+          }
+        }
+      })
+      if (!trolly) throw new Error('ٹرالی نہیں ملی')
+
+      const { bookNumber, StartingNum, total, transactionId } = trolly
+      const { activeBook } = trolly.transaction
+      if (!activeBook) throw new Error('منسلک ایکٹو کتاب نہیں ملی')
+
+      const allTrollies = await prisma.trolly.findMany({
+        where: { bookNumber },
+        orderBy: { StartingNum: 'asc' }
+      })
+      if (!allTrollies.length) throw new Error('اس کتاب کے لیے کوئی ٹرالیاں نہیں')
+
+      const highestEnding = allTrollies[allTrollies.length - 1].EndingNum
+
+      return await prisma.$transaction(async (prisma) => {
+        if (!activeBook.isActive || activeBook.usedTickets >= MAX_TICKETS_PER_BOOK) {
+          const txns = await prisma.transaction.findMany({
+            where: { activeBookId: activeBook.id }
+          })
+          const txIds = txns.map((t) => t.id)
+
+          await prisma.deletedTransaction.createMany({
+            data: txIds.map((txId) => ({ transactionId: txId }))
+          })
+
+          await prisma.akhrajat.deleteMany({ where: { transactionId: { in: txIds } } })
+          await prisma.trolly.deleteMany({ where: { activeBookId: activeBook.id } })
+          await prisma.transaction.deleteMany({ where: { activeBookId: activeBook.id } })
+
+          await prisma.activeBook.update({
+            where: { id: activeBook.id },
+            data: { usedTickets: 0, isActive: false }
+          })
+
+          return { message: `کتاب نمبر ${bookNumber} پوری طرح حذف کر دی گئی۔` }
+        }
+
+        const toDeleteTrollyIds = allTrollies
+          .filter((tr) => tr.StartingNum >= StartingNum)
+          .map((tr) => tr.id)
+
+        const totalTickets = allTrollies
+          .filter((tr) => tr.StartingNum >= StartingNum)
+          .reduce((sum, tr) => sum + tr.total, 0)
+
+        const toDeleteTxns = await prisma.transaction.findMany({
+          where: {
+            trollies: {
+              some: { id: { in: toDeleteTrollyIds } }
+            }
+          }
+        })
+        const toDeleteTxnIds = toDeleteTxns.map((t) => t.id)
+
+        await prisma.deletedTransaction.createMany({
+          data: toDeleteTxnIds.map((txId) => ({ transactionId: txId }))
+        })
+
+        await prisma.akhrajat.deleteMany({ where: { transactionId: { in: toDeleteTxnIds } } })
+        await prisma.trolly.deleteMany({ where: { id: { in: toDeleteTrollyIds } } })
+        await prisma.transaction.deleteMany({ where: { id: { in: toDeleteTxnIds } } })
+
+        await prisma.activeBook.update({
+          where: { id: activeBook.id },
+          data: {
+            usedTickets: {
+              decrement: Math.min(totalTickets, activeBook.usedTickets)
+            }
+          }
+        })
+
+        return {
+          message: `ٹرالی ${StartingNum} سے ${highestEnding} تک حذف کر دی گئیں۔`
+        }
+      })
+    } catch (err) {
+      console.error('Delete Trolley Error:', err)
+      throw new Error(err.message || 'ٹرالی حذف کرنے میں ناکامی')
+    }
+  })
+  ipcMain.handle('transactions:deleteActiveBook', async (_event, bookId) => {
+    try {
+      // Check if the book has any trollies
+      const trolleyCount = await prisma.trolly.count({
+        where: { activeBookId: Number(bookId) }
+      })
+      if (trolleyCount > 0) {
+        throw new Error('Cannot delete active book with associated trollies')
+      }
+      await prisma.activeBook.delete({
+        where: { id: Number(bookId) }
+      })
+      return { message: 'Active book deleted successfully' }
+    } catch (err) {
+      console.error('Delete Active Book Error:', err)
+      throw new Error(`Failed to delete active book: ${err.message}`)
+    }
   })
 }
 

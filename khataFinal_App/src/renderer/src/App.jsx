@@ -9,6 +9,8 @@ import TransactionSummary from './components/TransactionSummary.jsx'
 import Trolly_Summary_old from './components/Trolly_summary_old.jsx'
 import GariSummary from './components/GariSummary.jsx'
 import MutafarikAkhrajatSummary from './components/MutafarikAkhrajatSummary.jsx'
+import 'react-toastify/dist/ReactToastify.css';
+import { ToastContainer } from 'react-toastify';
 
 function App() {
   return (

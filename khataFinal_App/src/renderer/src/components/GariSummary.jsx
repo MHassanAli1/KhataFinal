@@ -10,8 +10,6 @@ export default function GariSummary() {
   const [gariExpenseTypes, setGariExpenseTypes] = useState([]) // [{id,name}]
   const [zonesList, setZonesList] = useState([]) // [{id,name}]
   const [khdaList, setKhdaList] = useState([]) // [{name}]
-  /* user-entered book filter (text input) */
-  const [bookFilter, setBookFilter] = useState('')
 
   /* ---------------- Filters ---------------- */
   const [filters, setFilters] = useState({
@@ -111,13 +109,12 @@ export default function GariSummary() {
       gariTitle: filters.gariTitle,
       zoneName: zoneName || undefined,
       khdaName: filters.khdaName || undefined,
-      bookNumber: bookFilter || undefined,
       dateFrom: filters.dateFrom || undefined,
       dateTo: filters.dateTo || undefined
     }
 
     try {
-      const result = await window.api.akhrajat.gariSummary(payload) // ✅ fixed
+      const result = await window.api.akhrajat.gariSummary(payload)
       setData(result)
     } catch (err) {
       console.error('gariSummary fetch failed:', err)
@@ -224,18 +221,6 @@ export default function GariSummary() {
           </select>
         </div>
 
-        {/* Book number (text) */}
-        <div className="filter-item">
-          <label className="filter-label">کتاب نمبر:</label>
-          <input
-            type="text"
-            placeholder="کتاب نمبر"
-            className="filter-input"
-            value={bookFilter}
-            onChange={(e) => setBookFilter(e.target.value)}
-          />
-        </div>
-
         {/* Date From */}
         <div className="filter-item">
           <label className="filter-label">تاریخ (سے):</label>
@@ -259,10 +244,7 @@ export default function GariSummary() {
         </div>
 
         {/* Search */}
-        <button
-          className="search-button"
-          onClick={fetchSummary}
-        >
+        <button className="search-button" onClick={fetchSummary}>
           تلاش کریں
         </button>
       </div>
@@ -290,10 +272,7 @@ export default function GariSummary() {
                 <div key={type} className="expense-type-card">
                   <div className="expense-type-header">
                     <h3 className="expense-type-title">{type}</h3>
-                    <button
-                      className="toggle-details-btn"
-                      onClick={() => toggleType(type)}
-                    >
+                    <button className="toggle-details-btn" onClick={() => toggleType(type)}>
                       {open ? 'تفصیل بند کریں' : 'تفصیل دکھائیں'}
                     </button>
                   </div>
@@ -316,7 +295,9 @@ export default function GariSummary() {
                           return (
                             <div key={part} className="parts-list-item">
                               <span>{part}</span>
-                              <span>{fmt(rp.amount)} (اندراجات: {fmt(rp.count)})</span>
+                              <span>
+                                {fmt(rp.amount)} (اندراجات: {fmt(rp.count)})
+                              </span>
                             </div>
                           )
                         })}
@@ -333,8 +314,6 @@ export default function GariSummary() {
                             <th>تاریخ</th>
                             <th>زون</th>
                             <th>کھدہ</th>
-                            <th>کتاب</th>
-                            <th>ٹکٹ</th>
                             {info.totalQuantity > 0 && <th>مقدار</th>}
                             {type === 'مرمت' && <th>پرزہ</th>}
                             <th>رقم</th>
@@ -346,14 +325,8 @@ export default function GariSummary() {
                               <td>{e.date ? e.date.slice(0, 10) : ''}</td>
                               <td>{e.zone || ''}</td>
                               <td>{e.khda || ''}</td>
-                              <td>{e.bookNumber || ''}</td>
-                              <td>{e.ticketNumber ?? ''}</td>
-                              {info.totalQuantity > 0 && (
-                                <td>{e.quantity ?? ''}</td>
-                              )}
-                              {type === 'مرمت' && (
-                                <td>{e.part ?? ''}</td>
-                              )}
+                              {info.totalQuantity > 0 && <td>{e.quantity ?? ''}</td>}
+                              {type === 'مرمت' && <td>{e.part ?? ''}</td>}
                               <td>{fmt(e.amount)}</td>
                             </tr>
                           ))}
@@ -408,8 +381,10 @@ export default function GariSummary() {
       )}
 
       {/* No data message (after search) */}
-      {!loading && data && data.rawCount === 0 && <p className="no-data-message">کوئی ریکارڈ نہیں ملا۔</p>}
-      
+      {!loading && data && data.rawCount === 0 && (
+        <p className="no-data-message">کوئی ریکارڈ نہیں ملا۔</p>
+      )}
+
       <div className="developer-mark">
         <span className="developer-text">Made with ❤️ by Cache</span>
       </div>

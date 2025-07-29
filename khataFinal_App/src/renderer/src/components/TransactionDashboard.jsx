@@ -2,10 +2,12 @@ import { useEffect, useState, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import './TransactionDashboard.css'
 import TransactionDetails from './TransactionDetails'
-import UrduKeyboard from './UrduKeyboard' // Import UrduKeyboard component
+import UrduKeyboard from './UrduKeyboard'
 import { LogoutButton } from './logout'
 import SyncToCloudButton from './SyncToCloudButton'
 import CheckForUpdates from './CheckForUpdates'
+import { ToastContainer, toast } from 'react-toastify'
+import 'react-toastify/dist/ReactToastify.css'
 
 function TransactionDashboard() {
   const [transactions, setTransactions] = useState([])
@@ -13,7 +15,8 @@ function TransactionDashboard() {
   const [pendingDelete, setPendingDelete] = useState({
     id: null,
     confirmMessage: '',
-    mode: null
+    mode: null,
+    bookNumber: null
   })
   const [editRows, setEditRows] = useState({})
   const [editConfirmId, setEditConfirmId] = useState(null)
@@ -29,31 +32,35 @@ function TransactionDashboard() {
   const [filterBookNumber, setFilterBookNumber] = useState('')
 
   const navigate = useNavigate()
-
-  // Keyboard state
+  const inputRefs = useRef({})
   const [showKeyboard, setShowKeyboard] = useState(false)
   const [activeInput, setActiveInput] = useState(null)
 
-  // References for text input fields
-  const inputRefs = useRef({})
+  // Refresh transactions after updates or deletions
+  const refreshTransactions = async () => {
+    try {
+      const txns = await window.api.transactions.getAll({
+        zoneName: filterZone || undefined,
+        khdaName: filterKhda || undefined,
+        bookNumber: filterBookNumber ? parseInt(filterBookNumber, 10) : undefined,
+        dateFrom: filterStartDate || undefined,
+        dateTo: filterEndDate || undefined
+      })
+      setTransactions(txns || [])
+    } catch (err) {
+      console.error('Error fetching transactions:', err)
+      toast.error('ریکارڈز لوڈ کرنے میں ناکامی')
+    }
+  }
 
-  // Add effect to add/remove body class for editing mode
   useEffect(() => {
-    if (Object.keys(editRows).length > 0) {
-      document.body.classList.add('editing-active-body')
-    } else {
-      document.body.classList.remove('editing-active-body')
-    }
-
-    // Clean up on unmount
-    return () => {
-      document.body.classList.remove('editing-active-body')
-    }
+    document.body.classList.toggle('editing-active-body', Object.keys(editRows).length > 0)
+    return () => document.body.classList.remove('editing-active-body')
   }, [editRows])
 
   useEffect(() => {
-    window.api.transactions.getAll().then(setTransactions)
-  }, [])
+    refreshTransactions()
+  }, [filterZone, filterKhda, filterBookNumber, filterStartDate, filterEndDate])
 
   useEffect(() => {
     if (filterZoneId) {
@@ -61,11 +68,13 @@ function TransactionDashboard() {
         .getAll(Number(filterZoneId))
         .then((khdas) => setFilterKhdaList(khdas.map((k) => k.name)))
         .catch((err) => {
-          console.error('Error fetching khdas', err)
+          console.error('Error fetching khdas:', err)
           setFilterKhdaList([])
+          toast.error('کھدوں کی فہرست لوڈ کرنے میں ناکامی')
         })
     } else {
       setFilterKhdaList([])
+      setFilterKhda('')
     }
   }, [filterZoneId])
 
@@ -74,55 +83,42 @@ function TransactionDashboard() {
       .getAllkhdas()
       .then((khdas) => setAllKhdas(khdas.map((k) => k.name)))
       .catch((err) => {
-        console.error('Error fetching all khdas', err)
+        console.error('Error fetching all khdas:', err)
         setAllKhdas([])
+        toast.error('تمام کھدوں کی فہرست لوڈ کرنے میں ناکامی')
       })
   }, [])
 
   useEffect(() => {
-    window.api.admin.zones.getAll().then((zones) => {
-      setZoneList(zones)
-    })
+    window.api.admin.zones
+      .getAll()
+      .then(setZoneList)
+      .catch((err) => {
+        console.error('Error fetching zones:', err)
+        toast.error('زونز لوڈ کرنے میں ناکامی')
+      })
   }, [])
 
-  // Handle keyboard input
   const handleKeyPress = (char) => {
-    if (!activeInput) return
-
-    // For editing cells
-    if (activeInput.startsWith('edit-')) {
-      const [_, txnId, field] = activeInput.split('-')
-
-      if (char === 'backspace') {
-        setEditRows((prev) => {
-          const currentValue = prev[txnId][field] || ''
-          return {
-            ...prev,
-            [txnId]: {
-              ...prev[txnId],
-              [field]: currentValue.slice(0, -1)
-            }
-          }
-        })
-      } else {
-        setEditRows((prev) => ({
-          ...prev,
-          [txnId]: {
-            ...prev[txnId],
-            [field]: (prev[txnId][field] || '') + char
-          }
-        }))
+    if (!activeInput || !activeInput.startsWith('edit-')) return
+    const [_, txnId, field] = activeInput.split('-')
+    setEditRows((prev) => {
+      const currentValue = prev[txnId][field] || ''
+      return {
+        ...prev,
+        [txnId]: {
+          ...prev[txnId],
+          [field]: char === 'backspace' ? currentValue.slice(0, -1) : currentValue + char
+        }
       }
-    }
+    })
   }
 
-  // Handle input focus
   const handleInputFocus = (inputId) => {
     setActiveInput(inputId)
     setShowKeyboard(true)
   }
 
-  // Close keyboard
   const closeKeyboard = () => {
     setShowKeyboard(false)
     setActiveInput(null)
@@ -136,24 +132,26 @@ function TransactionDashboard() {
     navigate(route)
   }
 
-  // Filter transactions first
+  // Normalize Urdu text for comparison
+  const normalizeUrdu = (text) => {
+    return text
+      ? text
+          .normalize('NFKC') // Normalize Unicode
+          .replace(/[\u200B-\u200F\u202A-\u202E]/g, '') // Remove control characters
+          .trim()
+      : ''
+  }
+
   const filteredTransactions = transactions.filter((txn) => {
-    // zone filter
     const matchesZone =
-      !filterZone || txn.ZoneName?.toLowerCase().includes(filterZone.toLowerCase())
-
-    // khda filter
+      !filterZone || normalizeUrdu(txn.ZoneName || '').includes(normalizeUrdu(filterZone))
     const matchesKhda =
-      !filterKhda || txn.KhdaName?.toLowerCase().includes(filterKhda.toLowerCase())
-
-    // date filter
+      !filterKhda || normalizeUrdu(txn.KhdaName || '').includes(normalizeUrdu(filterKhda))
     let matchesDate = true
     if (filterStartDate || filterEndDate) {
       const txnDate = txn.date ? new Date(txn.date) : null
-
       if (txnDate) {
         const txnDateOnly = new Date(txnDate.getFullYear(), txnDate.getMonth(), txnDate.getDate())
-
         if (filterStartDate) {
           const startDate = new Date(filterStartDate)
           const startDateOnly = new Date(
@@ -161,47 +159,60 @@ function TransactionDashboard() {
             startDate.getMonth(),
             startDate.getDate()
           )
-          if (txnDateOnly < startDateOnly) {
-            matchesDate = false
-          }
+          if (txnDateOnly < startDateOnly) matchesDate = false
         }
-
         if (filterEndDate && matchesDate) {
           const endDate = new Date(filterEndDate)
           const endDateOnly = new Date(endDate.getFullYear(), endDate.getMonth(), endDate.getDate())
-          if (txnDateOnly > endDateOnly) {
-            matchesDate = false
-          }
+          if (txnDateOnly > endDateOnly) matchesDate = false
         }
       } else {
-        // if no date and user applied date filters, exclude
         matchesDate = false
       }
     }
-
-    // book number filter
     const matchesBookNumber =
-      !filterBookNumber || (txn.bookNumber && txn.bookNumber.toString().includes(filterBookNumber))
-
+      !filterBookNumber ||
+      (txn.trollies[0]?.bookNumber &&
+        txn.trollies[0].bookNumber.toString().includes(filterBookNumber.trim()))
     return matchesZone && matchesKhda && matchesDate && matchesBookNumber
   })
 
-  // Calculate totals based on FILTERED transactions only
   const totalByZone = filteredTransactions.reduce((acc, t) => {
-    acc[t.ZoneName] = acc[t.ZoneName] || {
+    const zone = normalizeUrdu(t.ZoneName || 'نامعلوم')
+    acc[zone] = acc[zone] || {
       KulAmdan: 0n,
       KulAkhrajat: 0n,
       SaafiAmdan: 0n,
       Exercise: 0n,
       KulMaizan: 0n
     }
-    acc[t.ZoneName].KulAmdan += BigInt(t.KulAmdan)
-    acc[t.ZoneName].KulAkhrajat += BigInt(t.KulAkhrajat)
-    acc[t.ZoneName].SaafiAmdan += BigInt(t.SaafiAmdan)
-    acc[t.ZoneName].Exercise += BigInt(t.Exercise || 0)
-    acc[t.ZoneName].KulMaizan += BigInt(t.KulMaizan || 0)
+    acc[zone].KulAmdan += BigInt(t.KulAmdan || 0)
+    acc[zone].KulAkhrajat += BigInt(t.KulAkhrajat || 0)
+    acc[zone].SaafiAmdan += BigInt(t.SaafiAmdan || 0)
+    acc[zone].Exercise += BigInt(t.Exercise || 0)
+    acc[zone].KulMaizan += BigInt(t.KulMaizan || 0)
     return acc
   }, {})
+
+  const handleDeleteConfirmation = async () => {
+    try {
+      let message
+      if (
+        pendingDelete.mode === 'book' ||
+        pendingDelete.mode === 'single' ||
+        pendingDelete.mode === 'cascade'
+      ) {
+        const response = await window.api.transactions.deleteTrolly(pendingDelete.id)
+        message = response.message || `ٹرالی یا کتاب حذف ہو گئی۔`
+      }
+      setPendingDelete({ id: null, confirmMessage: '', mode: null, bookNumber: null })
+      await refreshTransactions()
+      toast.success(message)
+    } catch (err) {
+      console.error('Delete error:', err)
+      toast.error(`حذف کرنے میں ناکامی: ${err.message}`)
+    }
+  }
 
   return (
     <div className="transaction-dashboard">
@@ -217,7 +228,7 @@ function TransactionDashboard() {
           📊 اعداد و شمار
         </button>
       </div>
-
+      <ToastContainer position="top-right" autoClose={3000} />
       <div className="filters">
         <label>
           زون منتخب کریں:
@@ -226,7 +237,6 @@ function TransactionDashboard() {
             onChange={(e) => {
               const id = e.target.value
               setFilterZoneId(id)
-              setFilterKhda('') // ✅ reset the khda filter when zone changes
               const name = zoneList.find((z) => z.id === Number(id))?.name || ''
               setFilterZone(name)
             }}
@@ -235,23 +245,23 @@ function TransactionDashboard() {
             <option value="">-- تمام زون --</option>
             {zoneList.map((zone) => (
               <option key={zone.id} value={zone.id}>
-                {zone.name}
+                {normalizeUrdu(zone.name)}
               </option>
             ))}
           </select>
         </label>
-
         <label>
           کھدہ منتخب کریں:
           <select
             value={filterKhda}
             onChange={(e) => setFilterKhda(e.target.value)}
             className="filter-select"
+            disabled={!filterKhdaList.length}
           >
             <option value="">-- تمام کھدے --</option>
             {filterKhdaList.map((khda) => (
               <option key={khda} value={khda}>
-                {khda}
+                {normalizeUrdu(khda)}
               </option>
             ))}
           </select>
@@ -264,6 +274,7 @@ function TransactionDashboard() {
             onChange={(e) => setFilterBookNumber(e.target.value)}
             className="filter-input"
             placeholder="کتاب نمبر درج کریں"
+            onFocus={() => handleInputFocus('filter-bookNumber')}
           />
         </label>
         <label>
@@ -274,7 +285,6 @@ function TransactionDashboard() {
             onChange={(e) => setFilterStartDate(e.target.value)}
           />
         </label>
-
         <label>
           آخری تاریخ:
           <input
@@ -318,6 +328,7 @@ function TransactionDashboard() {
                       <input
                         type="date"
                         className="edit-input"
+                        readOnly
                         value={
                           edited.date
                             ? typeof edited.date === 'string'
@@ -336,7 +347,7 @@ function TransactionDashboard() {
                       typeof txn.date === 'string' ? (
                         txn.date
                       ) : (
-                        new Date(txn.date).toLocaleDateString()
+                        new Date(txn.date).toLocaleDateString('ur-PK')
                       )
                     ) : (
                       '—'
@@ -346,7 +357,8 @@ function TransactionDashboard() {
                     {isEditing ? (
                       <select
                         className="edit-input"
-                        value={edited.ZoneName || txn.ZoneName || ``}
+                        value={edited.ZoneName || txn.ZoneName || ''}
+                        readOnly
                         onChange={(e) =>
                           setEditRows((prev) => ({
                             ...prev,
@@ -356,19 +368,20 @@ function TransactionDashboard() {
                       >
                         {zoneList.map((zone) => (
                           <option key={zone.id} value={zone.name}>
-                            {zone.name}
+                            {normalizeUrdu(zone.name)}
                           </option>
                         ))}
                       </select>
                     ) : (
-                      txn.ZoneName
+                      normalizeUrdu(txn.ZoneName) || '—'
                     )}
                   </td>
                   <td>
                     {isEditing ? (
                       <select
                         className="edit-input"
-                        value={edited.KhdaName || txn.KhdaName || ``}
+                        value={edited.KhdaName || txn.KhdaName || ''}
+                        readOnly
                         onChange={(e) =>
                           setEditRows((prev) => ({
                             ...prev,
@@ -378,12 +391,12 @@ function TransactionDashboard() {
                       >
                         {allKhdas.map((khda) => (
                           <option key={khda} value={khda}>
-                            {khda}
+                            {normalizeUrdu(khda)}
                           </option>
                         ))}
                       </select>
                     ) : (
-                      txn.KhdaName
+                      normalizeUrdu(txn.KhdaName) || '—'
                     )}
                   </td>
                   <td>{txn.trollies[0]?.bookNumber ?? '—'}</td>
@@ -397,7 +410,7 @@ function TransactionDashboard() {
                         className="edit-input"
                         dir="ltr"
                         onWheel={(e) => e.target.blur()}
-                        value={edited.KulAmdan || txn.KulAmdan || ``}
+                        value={edited.KulAmdan || txn.KulAmdan || ''}
                         onChange={(e) =>
                           setEditRows((prev) => ({
                             ...prev,
@@ -416,7 +429,8 @@ function TransactionDashboard() {
                         className="edit-input"
                         dir="ltr"
                         onWheel={(e) => e.target.blur()}
-                        value={edited.KulAkhrajat || txn.KulAkhrajat || ``}
+                        readOnly
+                        value={edited.KulAkhrajat || txn.KulAkhrajat || ''}
                         onChange={(e) =>
                           setEditRows((prev) => ({
                             ...prev,
@@ -435,7 +449,7 @@ function TransactionDashboard() {
                         className="edit-input"
                         dir="ltr"
                         onWheel={(e) => e.target.blur()}
-                        value={edited.SaafiAmdan || txn.SaafiAmdan || ``}
+                        value={edited.SaafiAmdan || txn.SaafiAmdan || ''}
                         onChange={(e) =>
                           setEditRows((prev) => ({
                             ...prev,
@@ -454,7 +468,7 @@ function TransactionDashboard() {
                         className="edit-input"
                         dir="ltr"
                         onWheel={(e) => e.target.blur()}
-                        value={edited.Exercise || txn.Exercise || 0 || ``}
+                        value={edited.Exercise || txn.Exercise || 0}
                         onChange={(e) =>
                           setEditRows((prev) => ({
                             ...prev,
@@ -471,9 +485,9 @@ function TransactionDashboard() {
                       <input
                         type="number"
                         className="edit-input"
-                        value={edited.KulMaizan || txn.KulMaizan || 0}
                         dir="ltr"
                         onWheel={(e) => e.target.blur()}
+                        value={edited.KulMaizan || txn.KulMaizan || 0}
                         onChange={(e) =>
                           setEditRows((prev) => ({
                             ...prev,
@@ -520,50 +534,60 @@ function TransactionDashboard() {
                           </button>
                           <button
                             className="delete-button"
-                            onClick={() => {
-                              // pull out the one Trolly record
+                            onClick={async () => {
                               const trolly = txn.trollies[0]
-                              // count how many trolleys have this bookNumber
-                              const all = transactions.filter(
-                                (t) => t.trollies[0]?.bookNumber === trolly.bookNumber
+                              if (!trolly) {
+                                toast.error('ٹرالی کی معلومات غائب ہیں')
+                                return
+                              }
+                              const bookNum = trolly.bookNumber
+                              const zone = normalizeUrdu(txn.ZoneName)
+                              const khda = normalizeUrdu(txn.KhdaName)
+                              const startNum = Number(trolly.StartingNum)
+
+                              const allInBook = transactions.filter(
+                                (t) => t.trollies[0]?.bookNumber === bookNum
                               )
-                              const last = Math.max(
-                                ...all.map((t) => Number(t.trollies[0].EndingNum))
+                              const totalInBook = allInBook.reduce(
+                                (sum, t) => sum + (t.trollies[0]?.total || 0),
+                                0
                               )
 
-                              // if the ActiveBook is still active or full, delete entire book
-                              if (all.length >= trolly.total || txn.activeBook.isActive) {
+                              const forward = allInBook.filter(
+                                (t) => Number(t.trollies[0]?.StartingNum) >= startNum
+                              )
+                              const forwardCount = forward.length
+
+                              const isFullOrInactive =
+                                txn.activeBook?.usedTickets >= 100 ||
+                                txn.activeBook?.isActive === false
+
+                              if (isFullOrInactive) {
                                 setPendingDelete({
                                   id: trolly.id,
-                                  confirmMessage:
-                                    'یہ کتاب فعال ہے یا مکمل ہے۔ پوری کتاب حذف کرنا چاہتے ہیں؟',
-                                  mode: 'book',
-                                  bookNumber: trolly.bookNumber
-                                })
-                              }
-                              // if this isn’t the very last trolley, cascade-delete the rest
-                              else if (BigInt(trolly.EndingNum) < BigInt(last)) {
-                                setPendingDelete({
-                                  id: trolly.id,
-                                  confirmMessage: `ٹرالی ${trolly.StartingNum} کے بعد باقی (${BigInt(trolly.EndingNum) + 1}–${last}) حذف ہوں گے۔ کیا تصدیق کرتے ہیں؟`,
-                                  mode: 'cascade',
-                                  bookNumber: trolly.bookNumber
-                                })
-                              }
-                              // otherwise, deleting the last trolley in this book
-                              else {
-                                setPendingDelete({
-                                  id: trolly.id,
-                                  confirmMessage: 'کیا آپ واقعی اس ٹرالی کو حذف کرنا چاہتے ہیں؟',
                                   mode: 'single',
-                                  bookNumber: trolly.bookNumber
+                                  bookNumber: bookNum,
+                                  confirmMessage: `کتاب نمبر ${bookNum} (زون: ${zone}، کھدہ: ${khda}) غیر فعال یا مکمل ہے۔ اس کی کل ${totalInBook} ٹکٹس حذف ہوں گی۔ کیا آپ تصدیق کرتے ہیں؟`
+                                })
+                              } else if (forwardCount > 1) {
+                                setPendingDelete({
+                                  id: trolly.id,
+                                  mode: 'cascade',
+                                  bookNumber: bookNum,
+                                  confirmMessage: `ٹرالی نمبر ${startNum} سے کتاب نمبر ${bookNum} کی کل ${forwardCount} ٹرالیاں حذف ہوں گی۔ کیا آپ تصدیق کرتے ہیں؟`
+                                })
+                              } else {
+                                setPendingDelete({
+                                  id: trolly.id,
+                                  mode: 'single',
+                                  bookNumber: bookNum,
+                                  confirmMessage: `کیا آپ واقعی کتاب نمبر ${bookNum} کی ٹرالی نمبر ${startNum} حذف کرنا چاہتے ہیں؟`
                                 })
                               }
                             }}
                           >
                             حذف
                           </button>
-
                           <button className="details-button" onClick={() => toggleExpand(txn.id)}>
                             {expandedId === txn.id ? '🔼 بند کریں' : '🔽 مزید دیکھیں'}
                           </button>
@@ -593,7 +617,7 @@ function TransactionDashboard() {
             {Object.entries(totalByZone).map(([zone, totals]) => (
               <div key={zone} className="zone-card">
                 <div className="zone-header">
-                  <strong> {zone}</strong>
+                  <strong>{normalizeUrdu(zone)}</strong>
                 </div>
                 <div className="zone-stats">
                   <div className="stat-item">
@@ -627,37 +651,21 @@ function TransactionDashboard() {
         )}
       </div>
 
-      {/* Confirmation Modal */}
-      {pendingDelete.id !== null && (
+      {(pendingDelete.id !== null || pendingDelete.mode === 'book') && (
         <div className="modal">
           <div className="modal-content">
             <div className="modal-icon">🗑️</div>
             <h3>حذف کی تصدیق</h3>
             <p>{pendingDelete.confirmMessage}</p>
             <div className="modal-buttons">
-              <button
-                className="confirm-delete-button"
-                onClick={async () => {
-                  try {
-                    if (pendingDelete.mode === 'book') {
-                      await window.api.transactions.deleteBookByNumber(pendingDelete.bookNumber)
-                    } else if (pendingDelete.mode === 'cascade') {
-                      await window.api.transactions.deleteFromTrolly(pendingDelete.id)
-                    } else {
-                      await window.api.transactions.deleteTrolly(pendingDelete.id)
-                    }
-                    setPendingDelete({ id: null, confirmMessage: '', mode: null })
-                    setTransactions(await window.api.transactions.getAll())
-                  } catch (err) {
-                    console.error('Delete error', err)
-                  }
-                }}
-              >
+              <button className="confirm-delete-button" onClick={handleDeleteConfirmation}>
                 ✅ تصدیق کریں
               </button>
               <button
                 className="cancel-modal-button"
-                onClick={() => setPendingDelete({ id: null, confirmMessage: '', mode: null })}
+                onClick={() =>
+                  setPendingDelete({ id: null, confirmMessage: '', mode: null, bookNumber: null })
+                }
               >
                 ❌ منسوخ کریں
               </button>
@@ -676,18 +684,24 @@ function TransactionDashboard() {
               <button
                 className="confirm-save-button"
                 onClick={async () => {
-                  const updatedData = editRows[editConfirmId]
-                  await window.api.transactions.update({
-                    id: editConfirmId,
-                    ...updatedData
-                  })
-                  setEditConfirmId(null)
-                  setEditRows((prev) => {
-                    const updated = { ...prev }
-                    delete updated[editConfirmId]
-                    return updated
-                  })
-                  setTransactions(await window.api.transactions.getAll())
+                  try {
+                    const updatedData = editRows[editConfirmId]
+                    await window.api.transactions.update({
+                      id: editConfirmId,
+                      ...updatedData
+                    })
+                    setEditConfirmId(null)
+                    setEditRows((prev) => {
+                      const updated = { ...prev }
+                      delete updated[editConfirmId]
+                      return updated
+                    })
+                    await refreshTransactions()
+                    toast.success('ترمیم کامیابی سے محفوظ ہو گئی۔')
+                  } catch (err) {
+                    console.error('Update error:', err)
+                    toast.error(`ترمیم محفوظ کرنے میں ناکامی: ${err.message}`)
+                  }
                 }}
               >
                 ✅ ہاں، محفوظ کریں
@@ -700,7 +714,6 @@ function TransactionDashboard() {
         </div>
       )}
 
-      {/* Keyboard toggle button */}
       <button
         type="button"
         className="circle-btn primary keyboard-toggle"
@@ -712,10 +725,8 @@ function TransactionDashboard() {
         </span>
       </button>
 
-      {/* Urdu Keyboard */}
       {showKeyboard && <UrduKeyboard onKeyPress={handleKeyPress} onClose={closeKeyboard} />}
 
-      {/* Bottom Navigation Menu */}
       <div className="bottom-navigation">
         <div className="bottom-nav-section">
           <h4 className="section-title">📊 رپورٹس اور خلاصہ</h4>
@@ -786,7 +797,6 @@ function TransactionDashboard() {
       </div>
 
       <LogoutButton />
-
       <div className="developer-mark">
         <span className="developer-text">Made with ❤️ by Cache</span>
       </div>
