@@ -40,6 +40,12 @@ export default function AdminPanel() {
   /* ========================= OthersTitles Create ========================= */
   const [newOtherTitle, setNewOtherTitle] = useState('') // NEW
 
+  /* ========================= Active-Book Registration ========================= */
+  const [regZone, setRegZone] = useState('')
+  const [regKhda, setRegKhda] = useState('')
+  const [newBookNumber, setNewBookNumber] = useState('')
+  const [activeBooks, setActiveBooks] = useState([])
+
   /* ========================= Editing State ========================= */
   const [editingZone, setEditingZone] = useState(null)
   const [editingZoneName, setEditingZoneName] = useState('')
@@ -132,23 +138,26 @@ export default function AdminPanel() {
    * Load All Admin Data
    * ================================================================= */
   const loadData = async () => {
-    const z = await window.api.admin.zones.getAll()
+    const [z, t, gt, et, gp, ot] = await Promise.all([
+      window.api.admin.zones.getAll(),
+      window.api.admin.akhrajatTitles.getAll(),
+      window.api.admin.gariTitles.getAll(),
+      window.api.admin.gariExpenseTypes.getAll(),
+      window.api.admin.gariParts.getAll(),
+      window.api.admin.othersTitles.getAll()
+    ])
     setZones(z)
-
-    const t = await window.api.admin.akhrajatTitles.getAll()
     setTitles(t)
-
-    const gt = await window.api.admin.gariTitles.getAll()
     setGariTitles(gt)
-
-    const et = await window.api.admin.gariExpenseTypes.getAll()
     setGariExpenseTypes(et)
-
-    const gp = await window.api.admin.gariParts.getAll()
     setGariParts(gp)
-
-    const ot = await window.api.admin.othersTitles.getAll() // NEW
     setOthersTitles(ot)
+
+    // if a zone+khda already selected, refresh activeBooks
+    if (regZone && regKhda) {
+      const ab = await window.api.transactions.getActiveBookByZone(regZone, regKhda)
+      setActiveBooks(ab)
+    }
   }
 
   useEffect(() => {
@@ -215,6 +224,37 @@ export default function AdminPanel() {
   const deleteKhda = async (id) => {
     await window.api.admin.khdas.delete(id)
     loadData()
+  }
+
+  //Active Book CRUD
+  const handleRegZoneChange = async (e) => {
+    const zone = e.target.value
+    setRegZone(zone)
+    setRegKhda('') // reset khda selection
+    setActiveBooks([])
+  }
+
+  const handleRegKhdaChange = async (e) => {
+    const khda = e.target.value
+    setRegKhda(khda)
+    if (regZone && khda) {
+      const ab = await window.api.transactions.getActiveBookByZone(regZone, khda)
+      setActiveBooks(ab)
+    }
+  }
+
+  const registerBook = async (e) => {
+    e.preventDefault()
+    if (!regZone || !regKhda || !newBookNumber) return
+    try {
+      await window.api.transactions.registerActiveBook(regZone, regKhda, Number(newBookNumber))
+      setNewBookNumber('')
+      // reload active books list
+      const ab = await window.api.transactions.getActiveBookByZone(regZone, regKhda)
+      setActiveBooks(ab)
+    } catch (err) {
+      alert(err.message)
+    }
   }
 
   /* ===================================================================
@@ -321,6 +361,66 @@ export default function AdminPanel() {
         ⬅️ واپس جائیں
       </button>
 
+      {/* ========================= Active Book Registration ========================= */}
+      <div className="section">
+        <h2 className="section-title">فعال کتاب رجسٹر کریں</h2>
+        <form onSubmit={registerBook} className="form">
+          <select value={regZone} onChange={handleRegZoneChange} className="select-input">
+            <option value="">زون منتخب کریں</option>
+            {zones.map((z) => (
+              <option key={z.id} value={z.name}>
+                {z.name}
+              </option>
+            ))}
+          </select>
+
+          <select
+            value={regKhda}
+            onChange={handleRegKhdaChange}
+            className="select-input"
+            disabled={!regZone}
+          >
+            <option value="">کھدہ منتخب کریں</option>
+            {zones
+              .find((z) => z.name === regZone)
+              ?.khdas.map((k) => (
+                <option key={k.id} value={k.name}>
+                  {k.name}
+                </option>
+              ))}
+          </select>
+
+          <input
+            type="number"
+            placeholder="نیا کتاب نمبر"
+            value={newBookNumber}
+            onChange={(e) => setNewBookNumber(e.target.value)}
+            onFocus={handleFocus}
+            id="newBookNumber"
+            className="input-text"
+            disabled={!regKhda}
+          />
+
+          <button
+            type="submit"
+            className="button-submit"
+            disabled={!regZone || !regKhda || !newBookNumber}
+          >
+            رجسٹر کریں
+          </button>
+        </form>
+
+        {/* Display active books for selected zone+khda */}
+        {activeBooks.length > 0 && (
+          <ul className="title-list">
+            {activeBooks.map((ab) => (
+              <li key={ab.id}>
+                کتاب نمبر {ab.bookNumber} — استعمال شدہ ٹکٹ: {ab.usedTickets}
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
       {/* ================================================================
        * Zones + Khda tree
        * ============================================================== */}

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import './CreateTransactionForm.css'
 import UrduKeyboard from './UrduKeyboard'
@@ -19,9 +19,6 @@ export default function CreateTransactionForm() {
   const [zone, setZone] = useState('')
   const [khda, setKhda] = useState('')
 
-  const [starting, setStarting] = useState(null)
-  const [ending, setEnding] = useState(null)
-  const [total, setTotal] = useState(null)
   const [kulAmdan, setKulAmdan] = useState(null)
   const [kulAkhrajat, setKulAkhrajat] = useState(null)
   const [saafiAmdan, setSaafiAmdan] = useState(null)
@@ -32,30 +29,16 @@ export default function CreateTransactionForm() {
 
   const [akhrajat, setAkhrajat] = useState([])
 
-  const [lastEnding, setLastEnding] = useState(0)
   const [zonesList, setZonesList] = useState([])
   const [khdaList, setKhdaList] = useState([])
   const [akhrajatTitles, setAkhrajatTitles] = useState([]) // [name, ...]
 
-  /* ------------------------------------------------------------------
-   * Book / Ticket selection
-   * ---------------------------------------------------------------- */
-  const [booksForKhda, setBooksForKhda] = useState([]) // [{bookNumber, usedTickets,nextTicket,isFull}, ...]
-  const [selectedBookNumber, setSelectedBookNumber] = useState('') // value from dropdown
-  const [manualBookNumber, setManualBookNumber] = useState('') // user typed
-  const [useManualBook, setUseManualBook] = useState(false) // toggle when user wants new book
-
-  // Computed “active” values we actually submit
-  const activeBookNumber = useMemo(() => {
-    return useManualBook ? manualBookNumber.trim() : selectedBookNumber.trim()
-  }, [useManualBook, manualBookNumber, selectedBookNumber])
-
-  const activeTicketNumber = useMemo(() => {
-    if (useManualBook) return 1 // brand new
-    const found = booksForKhda.find((b) => b.bookNumber === selectedBookNumber)
-    if (!found) return 1
-    return found.nextTicket ?? found.usedTickets + 1 // safe fallback
-  }, [useManualBook, selectedBookNumber, booksForKhda])
+  const [booksForKhda, setBooksForKhda] = useState([]) // [{ bookNumber, usedTickets }, …]
+  const [selectedBookNumber, setSelectedBookNumber] = useState('')
+  // these two now driven by book + total:
+  const [starting, setStarting] = useState(null)
+  const [ending, setEnding] = useState(null)
+  const [total, setTotal] = useState('')
 
   const [formError, setFormError] = useState('')
 
@@ -89,7 +72,6 @@ export default function CreateTransactionForm() {
     if (document.activeElement instanceof HTMLElement && document.activeElement !== document.body) {
       document.activeElement.blur()
     }
-    window.api.transactions.getLastEndingNumber().then(setLastEnding)
 
     setZone('')
     setKhda('')
@@ -108,8 +90,6 @@ export default function CreateTransactionForm() {
     // books
     setBooksForKhda([])
     setSelectedBookNumber('')
-    setManualBookNumber('')
-    setUseManualBook(false)
 
     setFormError('')
     setKhdaList([])
@@ -122,8 +102,6 @@ export default function CreateTransactionForm() {
    * Init fetch (static admin lookups)
    * ================================================================== */
   useEffect(() => {
-    window.api.transactions.getLastEndingNumber().then(setLastEnding)
-
     window.api.admin.zones.getAll().then((zones) => {
       setZonesList(zones)
     })
@@ -174,56 +152,49 @@ export default function CreateTransactionForm() {
   /* ==================================================================
    * Load books when khda changes
    * ================================================================== */
+  // when zone or khda changes, fetch active books
   useEffect(() => {
-    if (!khda) {
+    if (!zone || !khda) {
       setBooksForKhda([])
       setSelectedBookNumber('')
-      setManualBookNumber('')
-      setUseManualBook(false)
       return
     }
-    async function loadBooks() {
-      try {
-        const books = await window.api.transactions.getBooksByKhda(khda)
-        setBooksForKhda(books)
 
-        // Auto‑select logic:
-        const nonFull = books.filter((b) => !b.isFull)
-        if (nonFull.length === 1) {
-          setSelectedBookNumber(nonFull[0].bookNumber)
-          setUseManualBook(false)
-        } else {
-          setSelectedBookNumber('')
-          setUseManualBook(false)
-        }
-
-        // Backward‑compat fallback: if no books at all, try legacy getLatest
-        if (books.length === 0) {
-          const legacy = await window.api.transactions.getLatestByKhda(khda)
-          if (legacy?.bookNumber) {
-            setSelectedBookNumber(legacy.bookNumber)
-            setUseManualBook(false)
-          }
-        }
-      } catch (err) {
-        console.error('loadBooks error', err)
-        // fallback to legacy
-        window.api.transactions
-          .getLatestByKhda(khda)
-          .then((legacy) => {
-            if (legacy?.bookNumber) {
-              setSelectedBookNumber(legacy.bookNumber)
-              setUseManualBook(false)
-            }
-          })
-          .catch((err2) => {
-            console.error('legacy getLatestByKhda failed', err2)
-          })
-      }
+    const zoneName = zonesList.find((z) => z.id === +zone)?.name
+    if (!zoneName) {
+      setBooksForKhda([])
+      setSelectedBookNumber('')
+      return
     }
 
-    loadBooks()
-  }, [khda])
+    window.api.transactions
+      .getActiveBookByZone(zoneName, khda)
+      .then((books) => {
+        console.log('Fetched books:', books)
+        setBooksForKhda(books)
+        const nonFull = books.filter((b) => b.usedTickets < 100)
+        if (nonFull.length === 1) {
+          setSelectedBookNumber(nonFull[0].bookNumber.toString())
+        }
+      })
+      .catch((err) => {
+        console.error('Failed to fetch books:', err)
+        setBooksForKhda([])
+        setSelectedBookNumber('')
+      })
+  }, [zone, khda, zonesList])
+
+  //2) whenever user picks a book, compute the trolly start
+  useEffect(() => {
+    if (!selectedBookNumber) {
+      setStarting(null)
+      return
+    }
+    const bookNum = parseInt(selectedBookNumber, 10)
+    const found = booksForKhda.find((b) => b.bookNumber === bookNum)
+    const used = found ? found.usedTickets : 0
+    setStarting((bookNum - 1) * 100 + used + 1)
+  }, [selectedBookNumber, booksForKhda])
 
   /* ==================================================================
    * Auto-calc total trollies from starting/ending
@@ -252,19 +223,6 @@ export default function CreateTransactionForm() {
     const exc = parseFloat(exercise) || 0
     setKulMaizan(saafi + exc)
   }, [saafiAmdan, exercise])
-
-  /* ==================================================================
-   * Build <option> list for book select
-   * ================================================================== */
-  const bookOptions = useMemo(() => {
-    const opts = booksForKhda.map((b) => ({
-      value: b.bookNumber,
-      label: `${b.bookNumber} (استعمال شدہ: ${b.usedTickets} / 100)`
-    }))
-    // manual entry sentinel
-    opts.push({ value: '__manual__', label: 'نیا کتاب نمبر درج کریں…' })
-    return opts
-  }, [booksForKhda])
 
   /* ==================================================================
    * Refs management for Urdu keyboard across dynamic list
@@ -447,17 +405,6 @@ export default function CreateTransactionForm() {
         return
       }
 
-      if (!activeBookNumber) {
-        setFormError('براہ کرم کتاب نمبر منتخب یا درج کریں۔')
-        return
-      }
-
-      // Validate manual book number not colliding w/ selected
-      if (useManualBook && booksForKhda.some((b) => b.bookNumber === manualBookNumber.trim())) {
-        setFormError('یہ کتاب نمبر پہلے سے فعال ہے۔')
-        return
-      }
-
       // Validate gari sub‑records
       const hasIncompleteGari = akhrajat.some((item) => {
         if (!gariTitles.includes(item.title)) return false
@@ -523,10 +470,9 @@ export default function CreateTransactionForm() {
         userID: user.id,
         ZoneName: zoneName,
         KhdaName: khda,
-        StartingNum: starting,
-        EndingNum: ending,
-        total: total || 0,
-        bookNumber: activeBookNumber,
+        bookNumber: Number(selectedBookNumber), // ← send the book
+        totalTickets: Number(total), // ← send the tickets count
+        EndingNum: Number(ending), // ← as your IPC expects
         KulAmdan: BigInt(nKulAmdan),
         KulAkhrajat: BigInt(nKulAkhrajat),
         SaafiAmdan: BigInt(nSaafiAmdan),
@@ -571,10 +517,6 @@ export default function CreateTransactionForm() {
       )}
 
       <form key={formKey} onSubmit={handleSubmit} className="transaction-form">
-        <div className="last-ending-display">
-          آخری اختتامی نمبر: <strong>{lastEnding.toString()}</strong>
-        </div>
-
         <div className="form-section">
           <label htmlFor="date">تاریخ منتخب کریں:</label>
           <input
@@ -616,49 +558,20 @@ export default function CreateTransactionForm() {
             ))}
           </select>
 
-          {/* ------------------------------------------------------------
-           * Book selector (supports multiple active books)
-           * ------------------------------------------------------------ */}
-          <label htmlFor="bookSelect">کتاب نمبر منتخب کریں:</label>
+          {/* Manual book input when needed */}
+          <label>کتاب نمبر:</label>
           <select
-            id="bookSelect"
-            className="form-select"
-            value={useManualBook ? '__manual__' : selectedBookNumber}
-            onChange={(e) => {
-              const val = e.target.value
-              if (val === '__manual__') {
-                setUseManualBook(true)
-                setSelectedBookNumber('')
-              } else {
-                setUseManualBook(false)
-                setSelectedBookNumber(val)
-              }
-            }}
+            value={selectedBookNumber}
+            onChange={(e) => setSelectedBookNumber(e.target.value)}
             disabled={!khda}
           >
             <option value="">-- منتخب کریں --</option>
-            {bookOptions.map((opt) => (
-              <option key={opt.value} value={opt.value}>
-                {opt.label}
+            {booksForKhda.map((b) => (
+              <option key={b.bookNumber} value={b.bookNumber}>
+                {b.bookNumber} (استعمال شدہ: {b.usedTickets}/100)
               </option>
             ))}
           </select>
-
-          {/* Manual book input when needed */}
-          {useManualBook && (
-            <input
-              id="bookNumber"
-              className="form-input"
-              placeholder="نیا کتاب نمبر"
-              value={manualBookNumber}
-              onChange={(e) => setManualBookNumber(e.target.value)}
-            />
-          )}
-
-          {/* Ticket display */}
-          <div className="ticket-number-hint">
-            موجودہ ٹکٹ نمبر: <strong>{activeTicketNumber}</strong> / 100
-          </div>
 
           <label htmlFor="starting">ابتدائی نمبر:</label>
           <input
@@ -670,6 +583,7 @@ export default function CreateTransactionForm() {
             type="number"
             dir="ltr"
             onWheel={(e) => e.target.blur()}
+            readOnly
           />
 
           <label htmlFor="ending">اختتامی نمبر:</label>

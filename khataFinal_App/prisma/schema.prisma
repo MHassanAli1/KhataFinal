@@ -19,48 +19,51 @@ model User {
 }
 
 model Transaction {
-  id           Int       @id @default(autoincrement())
-  userID       Int
-  user         User      @relation(fields: [userID], references: [id], onDelete: Cascade)
-  ZoneName     String
-  KhdaName     String
-  KulAmdan     BigInt
-  bookNumber   String
-  ticketNumber Int
-  date         DateTime
-  KulAkhrajat  BigInt
-  SaafiAmdan   BigInt
-  Exercise     BigInt
-  KulMaizan    BigInt
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
-  Synced       Boolean   @default(false)
-  SyncedAt     DateTime?
+  id          Int       @id @default(autoincrement())
+  userID      Int
+  user        User      @relation(fields: [userID], references: [id], onDelete: Cascade)
+  activeBookId Int
+  activeBook   ActiveBook      @relation(fields: [activeBookId], references: [id], onDelete: Cascade)
+  ZoneName    String
+  KhdaName    String
+  KulAmdan    BigInt
+  date        DateTime
+  KulAkhrajat BigInt
+  SaafiAmdan  BigInt
+  Exercise    BigInt
+  KulMaizan   BigInt
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  Synced      Boolean   @default(false)
+  SyncedAt    DateTime?
 
   trollies Trolly[]
   akhrajat Akhrajat[]
 }
-
 model Trolly {
   id          Int      @id @default(autoincrement())
   total       Int
+  bookNumber  Int
   StartingNum BigInt
   EndingNum   BigInt
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+
+  activeBookId Int
+  activeBook ActiveBook @relation(fields: [activeBookId], references: [id], onDelete: Cascade)
 
   transactionId Int
   transaction   Transaction @relation(fields: [transactionId], references: [id], onDelete: Cascade)
 }
 
 model Akhrajat {
-  id          Int      @id @default(autoincrement())
-  title       String
-  description String? // nullable if “Other”
-  amount      BigInt
-  date        DateTime // NEW: date when the expense was made
-  isGari      Boolean? @default(false)
-  isOther     Boolean? @default(false)
+  id             Int           @id @default(autoincrement())
+  title          String
+  description    String? // nullable if “Other”
+  amount         BigInt
+  date           DateTime // NEW: date when the expense was made
+  isGari         Boolean?      @default(false)
+  isOther        Boolean?      @default(false)
   othersTitlesId Int?
   othersTitles   OthersTitles? @relation(fields: [othersTitlesId], references: [id])
 
@@ -70,9 +73,9 @@ model Akhrajat {
   gariExpense GariExpense[]
 }
 
-model OthersTitles{
-  id   Int    @id @default(autoincrement())
-  name String @unique
+model OthersTitles {
+  id       Int        @id @default(autoincrement())
+  name     String     @unique
   akhrajat Akhrajat[]
 }
 
@@ -85,11 +88,21 @@ model GariExpense {
   akhrajat   Akhrajat @relation(fields: [akhrajatId], references: [id], onDelete: Cascade)
 }
 
-model UsedBookNumber {
-  id        Int      @id @default(autoincrement())
-  number    String   @unique
-  khdaName  String
+model ActiveBook {
+  id          Int     @id @default(autoincrement())
+  bookNumber  Int
+  zoneName    String
+  khdaName    String
+  isActive    Boolean @default(true)
+  usedTickets Int     @default(0)
+  maxTickets Int     @default(100)
+
+  transactions Transaction[]
+  trollies Trolly[]
+
   createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
 }
 
 //For Admin Panel
@@ -132,5 +145,3 @@ model GariParts {
   id   Int    @id @default(autoincrement())
   name String @unique
 }
-
-

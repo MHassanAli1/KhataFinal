@@ -35,9 +35,11 @@ const api = {
     /* list all/active books for a khda (rich metadata) */
     getBooksByKhda: (khdaName) => ipcRenderer.invoke('transactions:getBooksByKhda', khdaName),
 
-    /* NEW: explicitly register/activate a book for a khda (no ticket yet) */
-    registerBook: (khdaName, bookNumber) =>
-      ipcRenderer.invoke('transactions:registerBook', { khdaName, bookNumber })
+    registerActiveBook: (zoneName, khdaName, bookNumber) =>
+      ipcRenderer.invoke('transactions:registerActiveBook', { zoneName, khdaName, bookNumber }),
+
+    getActiveBookByZone: (zoneName, khdaName) =>
+      ipcRenderer.invoke('transactions:getActiveBookByZone', { zoneName, khdaName })
   },
   akhrajat: {
     create: (data) => ipcRenderer.invoke('akhrajat:create', data),

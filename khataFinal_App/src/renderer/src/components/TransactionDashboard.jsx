@@ -40,16 +40,16 @@ function TransactionDashboard() {
   // Add effect to add/remove body class for editing mode
   useEffect(() => {
     if (Object.keys(editRows).length > 0) {
-      document.body.classList.add('editing-active-body');
+      document.body.classList.add('editing-active-body')
     } else {
-      document.body.classList.remove('editing-active-body');
+      document.body.classList.remove('editing-active-body')
     }
 
     // Clean up on unmount
     return () => {
-      document.body.classList.remove('editing-active-body');
-    };
-  }, [editRows]);
+      document.body.classList.remove('editing-active-body')
+    }
+  }, [editRows])
 
   useEffect(() => {
     window.api.transactions.getAll().then(setTransactions)
@@ -285,7 +285,9 @@ function TransactionDashboard() {
         </label>
       </div>
 
-      <div className={`table-container ${Object.keys(editRows).length > 0 ? 'editing-active' : ''}`}>
+      <div
+        className={`table-container ${Object.keys(editRows).length > 0 ? 'editing-active' : ''}`}
+      >
         <table>
           <thead>
             <tr>
@@ -293,7 +295,9 @@ function TransactionDashboard() {
               <th>زون</th>
               <th>کھدہ</th>
               <th>کتاب نمبر</th>
-              <th>ٹکٹ نمبر</th>
+              <th>ابتدائی نمبر</th>
+              <th>اختتامی نمبر</th>
+              <th>کل ٹرالیاں</th>
               <th>کل آمدن</th>
               <th>کل اخراجات</th>
               <th>صافی آمدن</th>
@@ -382,8 +386,10 @@ function TransactionDashboard() {
                       txn.KhdaName
                     )}
                   </td>
-                  <td>{txn.bookNumber || '—'}</td>
-                  <td>{txn.ticketNumber || '—'}</td>
+                  <td>{txn.trollies[0]?.bookNumber ?? '—'}</td>
+                  <td>{txn.trollies[0]?.StartingNum.toString() ?? '—'}</td>
+                  <td>{txn.trollies[0]?.EndingNum.toString() ?? '—'}</td>
+                  <td>{txn.trollies[0]?.total ?? '—'}</td>
                   <td>
                     {isEditing ? (
                       <input
@@ -479,7 +485,6 @@ function TransactionDashboard() {
                       txn.KulMaizan?.toString() || '0'
                     )}
                   </td>
-
                   <td>
                     <div className="action-buttons">
                       {isEditing ? (
@@ -516,32 +521,42 @@ function TransactionDashboard() {
                           <button
                             className="delete-button"
                             onClick={() => {
-                              const bookTickets = transactions.filter(
-                                (t) => t.bookNumber === txn.bookNumber
+                              // pull out the one Trolly record
+                              const trolly = txn.trollies[0]
+                              // count how many trolleys have this bookNumber
+                              const all = transactions.filter(
+                                (t) => t.trollies[0]?.bookNumber === trolly.bookNumber
                               )
-                              const maxTicket = Math.max(...bookTickets.map((t) => t.ticketNumber))
-                              if (bookTickets.length >= 100) {
+                              const last = Math.max(
+                                ...all.map((t) => Number(t.trollies[0].EndingNum))
+                              )
+
+                              // if the ActiveBook is still active or full, delete entire book
+                              if (all.length >= trolly.total || txn.activeBook.isActive) {
                                 setPendingDelete({
-                                  id: txn.id,
+                                  id: trolly.id,
                                   confirmMessage:
-                                    'کتاب مکمل ہے، کیا آپ پوری کتاب حذف کرنا چاہتے ہیں؟',
+                                    'یہ کتاب فعال ہے یا مکمل ہے۔ پوری کتاب حذف کرنا چاہتے ہیں؟',
                                   mode: 'book',
-                                  bookNumber: txn.bookNumber // ✅ add this
+                                  bookNumber: trolly.bookNumber
                                 })
-                              } else if (txn.ticketNumber < maxTicket) {
+                              }
+                              // if this isn’t the very last trolley, cascade-delete the rest
+                              else if (BigInt(trolly.EndingNum) < BigInt(last)) {
                                 setPendingDelete({
-                                  id: txn.id,
-                                  confirmMessage: `ٹکٹ ${txn.ticketNumber} کو حذف کرنے سے ٹکٹ ${
-                                    txn.ticketNumber + 1
-                                  } سے ${maxTicket} بھی ختم ہوں گے۔ کیا آپ تصدیق کرتے ہیں؟`,
-                                  mode: 'partial'
+                                  id: trolly.id,
+                                  confirmMessage: `ٹرالی ${trolly.StartingNum} کے بعد باقی (${BigInt(trolly.EndingNum) + 1}–${last}) حذف ہوں گے۔ کیا تصدیق کرتے ہیں؟`,
+                                  mode: 'cascade',
+                                  bookNumber: trolly.bookNumber
                                 })
-                              } else {
+                              }
+                              // otherwise, deleting the last trolley in this book
+                              else {
                                 setPendingDelete({
-                                  id: txn.id,
-                                  confirmMessage:
-                                    'کیا آپ واقعی اس ریکارڈ کو حذف کرنا چاہتے ہیں؟',
-                                  mode: 'single'
+                                  id: trolly.id,
+                                  confirmMessage: 'کیا آپ واقعی اس ٹرالی کو حذف کرنا چاہتے ہیں؟',
+                                  mode: 'single',
+                                  bookNumber: trolly.bookNumber
                                 })
                               }
                             }}
@@ -626,10 +641,10 @@ function TransactionDashboard() {
                   try {
                     if (pendingDelete.mode === 'book') {
                       await window.api.transactions.deleteBookByNumber(pendingDelete.bookNumber)
-                    } else if (pendingDelete.mode === 'partial') {
-                      await window.api.transactions.deleteFromTicket(pendingDelete.id)
+                    } else if (pendingDelete.mode === 'cascade') {
+                      await window.api.transactions.deleteFromTrolly(pendingDelete.id)
                     } else {
-                      await window.api.transactions.delete(pendingDelete.id)
+                      await window.api.transactions.deleteTrolly(pendingDelete.id)
                     }
                     setPendingDelete({ id: null, confirmMessage: '', mode: null })
                     setTransactions(await window.api.transactions.getAll())
@@ -692,7 +707,9 @@ function TransactionDashboard() {
         onClick={() => setShowKeyboard(!showKeyboard)}
         aria-label="Toggle Urdu Keyboard"
       >
-        <span role="img" aria-label="keyboard">⌨️</span>
+        <span role="img" aria-label="keyboard">
+          ⌨️
+        </span>
       </button>
 
       {/* Urdu Keyboard */}
@@ -769,7 +786,7 @@ function TransactionDashboard() {
       </div>
 
       <LogoutButton />
-      
+
       <div className="developer-mark">
         <span className="developer-text">Made with ❤️ by Cache</span>
       </div>
