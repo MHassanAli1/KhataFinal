@@ -12,16 +12,16 @@ const api = {
   },
 
   transactions: {
-    create: (data) => ipcRenderer.invoke('transactions:create', data),
-    getLastEndingNumber: () => ipcRenderer.invoke('transactions:getLastEndingNumber'),
-    getAll: () => ipcRenderer.invoke('transactions:getAll'),
-    getById: (id) => ipcRenderer.invoke('transactions:getById', id),
-    update: (payload) => ipcRenderer.invoke('transactions:update', payload),
-    delete: (id) => ipcRenderer.invoke('transactions:delete', id),
-    deleteFromTrolly: (id) => ipcRenderer.invoke('transactions:deleteFromTicket', id),
-    search: (query) => ipcRenderer.invoke('transactions:search', query),
-    getOne: (id) => ipcRenderer.invoke('transaction:getOne', id), // legacy alias
-    getLatestByKhda: (khdaName) => ipcRenderer.invoke('transactions:getLatestByKhda', khdaName),
+  create: (data) => ipcRenderer.invoke('transactions:create', data),
+  getLastEndingNumber: () => ipcRenderer.invoke('transactions:getLastEndingNumber'),
+  getAll: (filters) => ipcRenderer.invoke('transactions:getAll', filters),
+  getById: (id) => ipcRenderer.invoke('transactions:getById', id),
+  update: (payload) => ipcRenderer.invoke('transactions:update', payload),
+  delete: (id) => ipcRenderer.invoke('transactions:delete', id),
+  deleteFromTrolly: (id) => ipcRenderer.invoke('transactions:deleteFromTicket', id),
+  search: (query) => ipcRenderer.invoke('transactions:search', query),
+  getOne: (id) => ipcRenderer.invoke('transaction:getOne', id), // legacy alias
+  getLatestByKhda: (khdaName) => ipcRenderer.invoke('transactions:getLatestByKhda', khdaName),
 
     /* mark as synced */
     markSynced: (data) => ipcRenderer.invoke('transactions:markSynced', data),

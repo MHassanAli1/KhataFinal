@@ -103,6 +103,7 @@ model ActiveBook {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  @@unique([zoneName, id])
 }
 
 //For Admin Panel

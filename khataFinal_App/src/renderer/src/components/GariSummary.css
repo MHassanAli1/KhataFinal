@@ -1,60 +1,72 @@
-/* GariSummary.css - Styled to match app design */
+/* Enhanced GariSummary.css - Light & Cool Theme */
 
 .gari-summary-container {
-  padding: 2rem;
+  padding: 2.5rem;
   font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
   direction: rtl;
-  max-width: 1200px;
+  max-width: 1400px;
   margin: 0 auto;
+  background: 
+    radial-gradient(1200px 600px at 10% 0%, rgba(59, 130, 246, 0.06), transparent 60%),
+    radial-gradient(1000px 500px at 90% 20%, rgba(16, 185, 129, 0.05), transparent 60%),
+    #f8fafc;
+  min-height: 100vh;
+  font-size: 1.3rem; /* Further increased base font size */
 }
 
 .gari-summary-title {
-  font-size: 2rem;
+  font-size: 2.6rem; /* Larger for better visibility */
   font-weight: 700;
-  margin-bottom: 1.5rem;
+  margin-bottom: 2rem;
   text-align: center;
-  color: #1e293b;
-  border-bottom: 3px solid #3b82f6;
-  padding-bottom: 0.5rem;
+  color: #111827;
+  border-bottom: 2px solid #e5e7eb;
+  padding-bottom: 1rem;
   display: inline-block;
 }
 
-/* Return button */
+/* Enhanced return button */
 .return-btn {
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  padding: 0.75rem 1.5rem;
-  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+  padding: 12px 24px; /* Increased padding */
+  background: #3b82f6;
   color: white;
-  border: none;
-  border-radius: 0.5rem;
-  font-size: 1rem;
-  font-weight: 600;
+  border: 2px solid #2563eb;
+  border-radius: 10px;
+  font-size: 1.1rem; /* Larger font */
+  font-weight: 700;
   cursor: pointer;
-  transition: all 0.3s ease;
-  box-shadow: 0 4px 6px rgba(59, 130, 246, 0.3);
-  margin-bottom: 1.5rem;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 4px 16px rgba(59, 130, 246, 0.3);
+  margin-bottom: 2rem;
   text-decoration: none;
 }
 
 .return-btn:hover {
-  transform: translateY(-3px);
-  box-shadow: 0 6px 12px rgba(59, 130, 246, 0.4);
-  background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(59, 130, 246, 0.4);
+  background: #2563eb;
+  border-color: #1d4ed8;
 }
 
-/* Filters section */
+/* Enhanced filters section */
 .filters-container {
-  background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
-  border-radius: 1rem;
+  background: #ffffff;
+  border-radius: 12px;
   padding: 1.5rem;
   margin-bottom: 2rem;
-  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.05);
-  border: 1px solid #e2e8f0;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+  border: 1px solid #e5e7eb;
+  transition: box-shadow 0.2s ease;
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
   gap: 1.25rem;
+}
+
+.filters-container:hover {
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.12);
 }
 
 .filter-item {
@@ -64,16 +76,16 @@
 }
 
 .filter-label {
-  font-size: 1rem;
-  font-weight: 600;
+  font-size: 1.1rem;
+  font-weight: 700;
   color: #334155;
 }
 
 .filter-input {
-  padding: 0.75rem 1rem;
+  padding: 0.9rem 1.1rem;
   border: 2px solid #cbd5e1;
   border-radius: 0.5rem;
-  font-size: 1rem;
+  font-size: 1.1rem;
   transition: all 0.3s ease;
   background-color: white;
   color: #1e293b;

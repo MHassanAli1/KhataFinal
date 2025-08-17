@@ -474,6 +474,12 @@ export default function AdminPanel() {
   return (
     <div className="container">
       <ToastContainer position="top-right" autoClose={3000} />
+
+      <div className="admin-header">
+        <h1>ایڈمن پینل</h1>
+        <p className="admin-subtitle">سسٹم کی تمام ترتیبات یہاں سے کریں</p>
+      </div>
+
       <button type="button" className="return-btn" onClick={() => navigate('/')}>
         ⬅️ واپس جائیں
       </button>
@@ -782,7 +788,7 @@ export default function AdminPanel() {
 
       {/* Add Title */}
       <div className="section">
-        <h2 className="section-title">نیا عنوان شامل کریں</h2>
+        <h2 className="section-title">نیا خرچہ کا عنوان شامل کریں</h2>
         <form
           onSubmit={(e) => {
             e.preventDefault()

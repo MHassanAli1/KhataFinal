@@ -47,7 +47,9 @@ body {
   min-height: 100vh;
   color: var(--color-text);
   background: var(--color-background);
-  line-height: 1.6;
+  line-height: 1.7;
+  /* Increased global font size for better official readability */
+  font-size: 18px;
   font-family:
     Inter,
     -apple-system,

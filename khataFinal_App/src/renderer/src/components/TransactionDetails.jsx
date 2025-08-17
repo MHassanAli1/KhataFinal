@@ -1,4 +1,5 @@
-import { useState, useEffect, useMemo } from 'react'
+/* eslint-disable */
+import { useState, useEffect, useMemo, useCallback } from 'react'
 import { toast } from 'react-toastify'
 import './TransactionDetails.css'
 
@@ -15,7 +16,7 @@ const MUTAFARIK_LABEL = 'متفرق' // MUST match AkhrajatTitle.name in DB
  * - Normalizes data on load/update.
  * - Updates parent transaction's KulAkhrajat on akhrajat changes.
  */
-export default function TransactionDetails({ transaction, onClose }) {
+export default function TransactionDetails({ transaction, onClose, onUpdate }) {
   /* --------------------------------------------------------------
    * Helpers
    * ------------------------------------------------------------ */
@@ -62,7 +63,7 @@ export default function TransactionDetails({ transaction, onClose }) {
     return opt?.label ?? title ?? 'N/A'
   }
 
-  const formatGariSummary = (ge, _amt, displayLabel) => {
+  const formatGariSummary = (ge) => {
     if (!ge) return ''
     const slug = toSlug(ge.title)
     const label = displayGariLabel(ge.title)
@@ -139,6 +140,20 @@ export default function TransactionDetails({ transaction, onClose }) {
       active = false
     }
   }, [transaction?.id])
+
+  // Fetch updated transaction from main and inform parent (dashboard)
+  const fetchUpdatedAndNotify = useCallback(async () => {
+    try {
+      const full = await (window.api?.transactions?.getById?.(transaction.id) ?? null)
+      if (full) {
+        const norm = (full.akhrajat || []).map(normalizeAkhrajatItem)
+        setAkhrajatList(norm)
+        if (typeof onUpdate === 'function') onUpdate(full)
+      }
+    } catch (err) {
+      console.error('TransactionDetails: refresh after change failed', err)
+    }
+  }, [transaction?.id, onUpdate])
 
   /* --------------------------------------------------------------
    * Admin lookups
@@ -300,6 +315,8 @@ export default function TransactionDetails({ transaction, onClose }) {
       })
       setFormError('')
       toast.success('اخراجات اپ ڈیٹ ہو گئے!')
+  // refresh transaction totals and notify parent
+  await fetchUpdatedAndNotify()
     } catch (err) {
       setFormError(err.message || 'اخراجات اپ ڈیٹ کرنے میں ناکامی')
       toast.error(err.message || 'اخراجات اپ ڈیٹ کرنے میں ناکامی')
@@ -315,6 +332,7 @@ export default function TransactionDetails({ transaction, onClose }) {
       setAkhrajatList((prev) => prev.filter((item) => item.id !== id))
       setFormError('')
       toast.success('اخراجات حذف ہو گئے!')
+  await fetchUpdatedAndNotify()
     } catch (err) {
       setFormError(err.message || 'اخراجات حذف کرنے میں ناکامی')
       toast.error(err.message || 'اخراجات حذف کرنے میں ناکامی')
@@ -373,6 +391,7 @@ export default function TransactionDetails({ transaction, onClose }) {
       setGariExpense({ title: '', quantity: '', part: '' })
       setFormError('')
       toast.success('نیا اخراجات شامل ہو گیا!')
+  await fetchUpdatedAndNotify()
     } catch (err) {
       setFormError(err.message || 'اخراجات شامل کرنے میں ناکامی')
       toast.error(err.message || 'اخراجات شامل کرنے میں ناکامی')
@@ -386,6 +405,31 @@ export default function TransactionDetails({ transaction, onClose }) {
     <div className="transaction-details">
       {formError && <div className="form-error-toast">{formError}</div>}
       {loadingFull && <div className="akhrajat-loading">…لوڈ ہو رہا ہے</div>}
+
+      {/* Trollies summary */}
+      <div className="trollies-section">
+        <h4>کتاب/ٹرالی</h4>
+        {(transaction.trollies || []).length === 0 ? (
+          <p className="no-data-message">کوئی ٹرالی نہیں</p>
+        ) : (
+          <ul className="trolly-list">
+            {(transaction.trollies || [])
+              .slice()
+              .sort((a, b) => Number(a.StartingNum) - Number(b.StartingNum))
+              .map((t) => (
+                <li key={t.id} className="trolly-item">
+                  <span>کتاب: {t.bookNumber}</span>
+                  <span> | </span>
+                  <span>
+                    رینج: {t.StartingNum?.toString()} – {t.EndingNum?.toString()}
+                  </span>
+                  <span> | </span>
+                  <span>کل: {t.total}</span>
+                </li>
+              ))}
+          </ul>
+        )}
+      </div>
 
       {/* Akhrajat List */}
       <div className="akhrajat-section">

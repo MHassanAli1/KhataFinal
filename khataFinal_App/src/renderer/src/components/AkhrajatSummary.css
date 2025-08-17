@@ -1,57 +1,82 @@
-/* AkhrajatSummary Styles */
+/* Enhanced AkhrajatSummary Styles - Light & Cool Theme */
 .akhrajat-summary {
-  padding: 1rem;
-  font-size: 1.2rem; /* Increased base font size */
+  padding: 2rem;
+  font-size: 1.4rem; /* Further increased for better readability */
+  background: 
+    radial-gradient(1200px 600px at 10% 0%, rgba(59, 130, 246, 0.06), transparent 60%),
+    radial-gradient(1000px 500px at 90% 20%, rgba(16, 185, 129, 0.05), transparent 60%),
+    #f8fafc;
+  min-height: 100vh;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
 }
 
 .akhrajat-summary h2 {
-  font-size: 1.8rem; /* Increased heading size */
-  margin-bottom: 1rem;
+  font-size: 2.5rem; /* Larger heading for impact */
+  margin-bottom: 2rem;
   text-align: center;
+  color: #111827;
+  font-weight: 700;
 }
 
 .filters {
   display: flex;
   flex-wrap: wrap;
-  gap: 1rem;
-  margin-bottom: 1.5rem;
-  padding: 1rem;
-  background-color: #f8fafc;
-  border-radius: 0.5rem;
+  gap: 1.5rem;
+  margin-bottom: 2rem;
+  padding: 1.5rem;
+  background: #ffffff;
+  border-radius: 12px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+  border: 1px solid #e5e7eb;
+  transition: box-shadow 0.2s ease;
+}
+
+.filters:hover {
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.12);
 }
 
 .filters label {
   display: flex;
   flex-direction: column;
-  font-size: 1.1rem; /* Increased label font size */
-  font-weight: 500;
+  font-size: 1.2rem; /* Increased label font size */
+  font-weight: 600;
 }
 
 .filters input,
 .filters select {
-  padding: 0.5rem;
-  border: 1px solid #ccc;
-  border-radius: 0.25rem;
-  font-size: 1.1rem; /* Increased input font size */
+  padding: 0.75rem 1rem;
+  border: 2px solid #e5e7eb;
+  border-radius: 0.5rem;
+  font-size: 1.2rem; /* Increased input font size */
   margin-top: 0.25rem;
 }
 
 .summary-table {
   overflow-x: auto;
+  background: #ffffff;
+  border-radius: 12px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+  border: 1px solid #e5e7eb;
 }
 
 .summary-table table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 1.2rem; /* Increased table font size */
+  font-size: 1.3rem; /* Increased for readability */
 }
 
 .summary-table th,
 .summary-table td {
-  padding: 1rem; /* Increased padding */
-  text-align: right;
-  border: 1px solid #ddd;
-  font-size: 1.2rem; /* Increased cell font size */
+  padding: 16px 20px; /* Increased padding */
+  text-align: center;
+  border-bottom: 1px solid #e5e7eb;
+  font-size: 1.2rem; /* Larger text */
+}
+
+.summary-table th {
+  background: #f8fafc;
+  font-weight: 700;
+  color: #111827;
 }
 
 .summary-table th {

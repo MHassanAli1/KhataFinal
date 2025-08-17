@@ -1,12 +1,13 @@
+/* eslint-disable */
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { urduZones } from './UrduZones';
 import './report.css';
-import { 
-  Chart as ChartJS, 
-  ArcElement, 
-  Tooltip, 
-  Legend, 
+import {
+  Chart as ChartJS,
+  ArcElement,
+  Tooltip,
+  Legend,
   CategoryScale,
   LinearScale,
   PointElement,
@@ -18,8 +19,8 @@ import { Pie, Bar, Line } from 'react-chartjs-2';
 
 // Register ChartJS components
 ChartJS.register(
-  ArcElement, 
-  Tooltip, 
+  ArcElement,
+  Tooltip,
   Legend,
   CategoryScale,
   LinearScale,
@@ -56,20 +57,20 @@ function Analytics() {
       try {
         setLoading(true);
         const data = await window.api.transactions.getAll();
-        
+
         // Validate data integrity
         const validData = data.filter(txn => (
-          txn && 
-          typeof txn === 'object' && 
-          (txn.KulAmdan !== undefined) && 
-          (txn.KulAkhrajat !== undefined) && 
+          txn &&
+          typeof txn === 'object' &&
+          (txn.KulAmdan !== undefined) &&
+          (txn.KulAkhrajat !== undefined) &&
           (txn.SaafiAmdan !== undefined)
         ));
-        
+
         if (validData.length < data.length) {
           console.warn(`Filtered out ${data.length - validData.length} invalid transaction records`);
         }
-        
+
         setTransactions(validData);
         setError(null);
       } catch (err) {
@@ -132,7 +133,7 @@ function Analytics() {
   // Prepare data for charts
   const prepareChartData = () => {
     const filteredData = getFilteredTransactions();
-    
+
     // Calculate zone distribution for pie chart
     const zoneData = {};
     filteredData.forEach(txn => {
@@ -147,10 +148,10 @@ function Analytics() {
     const monthlyData = {};
     filteredData.forEach(txn => {
       if (!txn.date) return;
-      
+
       const date = new Date(txn.date);
       const monthYear = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
-      
+
       if (!monthlyData[monthYear]) {
         monthlyData[monthYear] = {
           income: 0n,
@@ -160,15 +161,32 @@ function Analytics() {
           timestamp: date.getTime()
         };
       }
-      
+
       monthlyData[monthYear].income += BigInt(txn.KulAmdan || 0);
       monthlyData[monthYear].expenses += BigInt(txn.KulAkhrajat || 0);
       monthlyData[monthYear].netIncome += BigInt(txn.SaafiAmdan || 0);
     });
-    
+
+    // Akhrajat by Title (spending per expense type)
+    const akhByTitle = {};
+    filteredData.forEach(txn => {
+      const rows = txn.akhrajat || [];
+      rows.forEach(a => {
+        const title = a?.title || 'دیگر';
+        const amt = BigInt(a?.amount || 0);
+        if (!akhByTitle[title]) akhByTitle[title] = 0n;
+        akhByTitle[title] += amt;
+      });
+    });
+    // Sort by amount desc and cap to top 12 for readability
+    const akhSorted = Object.entries(akhByTitle)
+      .map(([title, amt]) => ({ title, amount: Number(amt) }))
+      .sort((a, b) => b.amount - a.amount)
+      .slice(0, 12);
+
     // Sort monthly data chronologically
     const sortedMonthlyData = Object.values(monthlyData).sort((a, b) => a.timestamp - b.timestamp);
-    
+
     setChartData({
       zoneDistribution: {
         labels: Object.keys(zoneData),
@@ -180,6 +198,10 @@ function Analytics() {
         income: sortedMonthlyData.map(d => Number(d.income)),
         expenses: sortedMonthlyData.map(d => Number(d.expenses)),
         netIncome: sortedMonthlyData.map(d => Number(d.netIncome))
+      },
+      akhrajatByTitle: {
+        labels: akhSorted.map(x => x.title),
+        amounts: akhSorted.map(x => x.amount)
       }
     });
   };
@@ -241,7 +263,7 @@ function Analytics() {
   // Find top performing zones
   const findTopZones = () => {
     const zoneMetrics = calculateZoneMetrics();
-    
+
     return Object.entries(zoneMetrics)
       .map(([zone, data]) => ({
         zone,
@@ -257,7 +279,7 @@ function Analytics() {
   // Render functions
   const renderSummaryCards = () => {
     const totals = calculateTotals();
-    
+
     return (
       <div className="summary-cards">
         <div className="summary-card">
@@ -293,7 +315,7 @@ function Analytics() {
     if (!chartData.zoneDistribution || chartData.zoneDistribution.labels.length === 0) {
       return <div className="no-data-message">اس فلٹر کے لیے کوئی ڈیٹا دستیاب نہیں ہے</div>;
     }
-    
+
     const pieData = {
       labels: chartData.zoneDistribution.labels,
       datasets: [
@@ -305,7 +327,7 @@ function Analytics() {
         },
       ],
     };
-    
+
     const options = {
       responsive: true,
       maintainAspectRatio: false,
@@ -341,7 +363,7 @@ function Analytics() {
         }
       },
     };
-    
+
     return (
       <div className="chart-container pie-chart">
         <Pie ref={pieChartRef} data={pieData} options={options} />
@@ -354,7 +376,7 @@ function Analytics() {
     if (!chartData.zoneDistribution || chartData.zoneDistribution.labels.length === 0) {
       return <div className="no-data-message">اس فلٹر کے لیے کوئی ڈیٹا دستیاب نہیں ہے</div>;
     }
-    
+
     const barData = {
       labels: chartData.zoneDistribution.labels,
       datasets: [
@@ -367,7 +389,7 @@ function Analytics() {
         },
       ],
     };
-    
+
     const options = {
       responsive: true,
       maintainAspectRatio: false,
@@ -411,7 +433,7 @@ function Analytics() {
         },
       },
     };
-    
+
     return (
       <div className="chart-container bar-chart">
         <Bar ref={barChartRef} data={barData} options={options} />
@@ -424,7 +446,7 @@ function Analytics() {
     if (!chartData.monthlyTrends || chartData.monthlyTrends.labels.length === 0) {
       return <div className="no-data-message">ماہانہ ڈیٹا دستیاب نہیں ہے</div>;
     }
-    
+
     const lineData = {
       labels: chartData.monthlyTrends.labels,
       datasets: [
@@ -458,7 +480,7 @@ function Analytics() {
         },
       ],
     };
-    
+
     const options = {
       responsive: true,
       maintainAspectRatio: false,
@@ -506,7 +528,7 @@ function Analytics() {
         intersect: false,
       },
     };
-    
+
     return (
       <div className="chart-container line-chart">
         <Line ref={lineChartRef} data={lineData} options={options} />
@@ -514,13 +536,73 @@ function Analytics() {
     );
   };
 
+  // Render bar chart for Akhrajat Types Spending
+  const renderAkhrajatTypesChart = () => {
+    if (!chartData.akhrajatByTitle || chartData.akhrajatByTitle.labels.length === 0) {
+      return <div className="no-data-message">اخراجات کی اقسام کا ڈیٹا دستیاب نہیں ہے</div>;
+    }
+
+    const labels = chartData.akhrajatByTitle.labels;
+    const data = chartData.akhrajatByTitle.amounts;
+
+    const barData = {
+      labels,
+      datasets: [
+        {
+          label: 'اخراجات (رقم)',
+          data: data,
+          backgroundColor: chartColors.slice(0, labels.length).map(c => c + 'B3'),
+          borderColor: chartColors.slice(0, labels.length),
+          borderWidth: 1,
+        }
+      ]
+    };
+
+    const options = {
+      responsive: true,
+      maintainAspectRatio: false,
+      indexAxis: 'y', // horizontal bars for long labels
+      scales: {
+        x: {
+          beginAtZero: true,
+          ticks: { color: '#333' },
+          grid: { color: 'rgba(0,0,0,0.1)' }
+        },
+        y: {
+          ticks: { color: '#333', autoSkip: false, maxRotation: 0, minRotation: 0 },
+          grid: { display: false }
+        }
+      },
+      plugins: {
+        legend: { display: true },
+        title: {
+          display: true,
+          text: 'اخراجات کی اقسام کے مطابق خرچ',
+          color: '#333',
+          font: { size: 16, weight: 'bold' }
+        },
+        tooltip: {
+          callbacks: {
+            label: (ctx) => ` ${ctx.dataset.label}: ${ctx.raw}`
+          }
+        }
+      }
+    };
+
+    return (
+      <div className="chart-container bar-chart">
+        <Bar data={barData} options={options} />
+      </div>
+    );
+  };
+
   const renderTopZones = () => {
     const topZones = findTopZones();
-    
+
     if (topZones.length === 0) {
       return <div className="no-data-message">کوئی ڈیٹا دستیاب نہیں ہے</div>;
     }
-    
+
     return (
       <div className="top-zones">
         <h3>بہترین کارکردگی والے زونز</h3>
@@ -543,8 +625,8 @@ function Analytics() {
   return (
     <div className="analytics-container">
       <div className="analytics-header">
-        <button 
-          type="button" 
+        <button
+          type="button"
           className="return-btn"
           onClick={() => navigate('/')}
         >
@@ -556,9 +638,9 @@ function Analytics() {
       <div className="analytics-filters">
         <div className="filter-group">
           <label htmlFor="timeFrame">دورانیہ:</label>
-          <select 
-            id="timeFrame" 
-            value={timeFrame} 
+          <select
+            id="timeFrame"
+            value={timeFrame}
             onChange={(e) => setTimeFrame(e.target.value)}
           >
             <option value="all">تمام وقت</option>
@@ -570,9 +652,9 @@ function Analytics() {
 
         <div className="filter-group">
           <label htmlFor="selectedZone">زون:</label>
-          <select 
-            id="selectedZone" 
-            value={selectedZone} 
+          <select
+            id="selectedZone"
+            value={selectedZone}
             onChange={(e) => setSelectedZone(e.target.value)}
           >
             <option value="">تمام زونز</option>
@@ -593,7 +675,7 @@ function Analytics() {
       ) : (
         <div className="analytics-content">
           {renderSummaryCards()}
-          
+
           <div className="analytics-row charts-row">
             <div className="analytics-col">
               {renderZoneDistributionChart()}
@@ -602,7 +684,7 @@ function Analytics() {
               {renderZonePerformanceChart()}
             </div>
           </div>
-          
+
           <div className="analytics-row">
             <div className="analytics-col">
               {renderTopZones()}
@@ -644,10 +726,16 @@ function Analytics() {
               </div>
             </div>
           </div>
-          
+
           <div className="analytics-row full-width">
             <div className="analytics-col">
               {renderMonthlyTrendsChart()}
+            </div>
+          </div>
+
+          <div className="analytics-row full-width">
+            <div className="analytics-col">
+              {renderAkhrajatTypesChart()}
             </div>
           </div>
         </div>

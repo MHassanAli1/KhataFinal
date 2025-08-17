@@ -32,10 +32,9 @@ export default function CreateTransactionForm() {
   const [khdaList, setKhdaList] = useState([])
   const [akhrajatTitles, setAkhrajatTitles] = useState([])
   const [booksForKhda, setBooksForKhda] = useState([])
-  const [selectedBookNumber, setSelectedBookNumber] = useState('')
-  const [starting, setStarting] = useState(null)
-  const [ending, setEnding] = useState(null)
-  const [total, setTotal] = useState('')
+  // Multiple book/trolly rows in a single transaction
+  // row: { bookNumber: '', starting: null, ending: '', total: '' }
+  const [trollyRows, setTrollyRows] = useState([])
   const [formError, setFormError] = useState('')
 
   const parseIntOrNull = (v) => {
@@ -69,9 +68,7 @@ export default function CreateTransactionForm() {
     }
     setZone('')
     setKhda('')
-    setStarting(null)
-    setEnding(null)
-    setTotal(null)
+    setTrollyRows([])
     setKulAmdan(null)
     setKulAkhrajat(null)
     setSaafiAmdan(null)
@@ -80,7 +77,6 @@ export default function CreateTransactionForm() {
     setDate('')
     setAkhrajat([])
     setBooksForKhda([])
-    setSelectedBookNumber('')
     setFormError('')
     setKhdaList([])
     closeKeyboard()
@@ -132,13 +128,13 @@ export default function CreateTransactionForm() {
   useEffect(() => {
     if (!zone || !khda) {
       setBooksForKhda([])
-      setSelectedBookNumber('')
+      setTrollyRows([])
       return
     }
     const zoneName = zonesList.find((z) => z.id === +zone)?.name
     if (!zoneName) {
       setBooksForKhda([])
-      setSelectedBookNumber('')
+      setTrollyRows([])
       return
     }
     window.api.transactions
@@ -146,40 +142,70 @@ export default function CreateTransactionForm() {
       .then((books) => {
         setBooksForKhda(books)
         const nonFull = books.filter((b) => b.usedTickets < 100)
+        // If exactly one active non-full book, prefill one row for convenience
         if (nonFull.length === 1) {
-          setSelectedBookNumber(nonFull[0].bookNumber.toString())
+          const bn = nonFull[0].bookNumber
+          setTrollyRows([
+            {
+              bookNumber: String(bn),
+              starting: (bn - 1) * 100 + nonFull[0].usedTickets + 1,
+              ending: '',
+              total: ''
+            }
+          ])
+        } else {
+          setTrollyRows([])
         }
       })
       .catch((err) => {
         console.error('Failed to fetch books:', err)
         setBooksForKhda([])
-        setSelectedBookNumber('')
+        setTrollyRows([])
       })
   }, [zone, khda, zonesList])
 
-  useEffect(() => {
-    if (!selectedBookNumber) {
-      setStarting(null)
-      return
-    }
-    const bookNum = parseInt(selectedBookNumber, 10)
+  // helpers for multi-row calculations
+  const computeStartingForRow = (rows, idx) => {
+    const row = rows[idx]
+    if (!row?.bookNumber) return null
+    const bookNum = parseInt(row.bookNumber, 10)
     const found = booksForKhda.find((b) => b.bookNumber === bookNum)
-    const used = found ? found.usedTickets : 0
-    setStarting((bookNum - 1) * 100 + used + 1)
-  }, [selectedBookNumber, booksForKhda])
+    const baseUsed = found ? Number(found.usedTickets || 0) : 0
+    const priorUsedInForm = rows
+      .slice(0, idx)
+      .filter((r) => parseInt(r.bookNumber, 10) === bookNum)
+      .reduce((sum, r) => sum + (parseInt(r.total, 10) || 0), 0)
+    return (bookNum - 1) * 100 + baseUsed + priorUsedInForm + 1
+  }
 
-  /* ==================================================================
-   * Auto-calc total trollies from starting/ending
-   * ================================================================== */
-  useEffect(() => {
-    const s = parseIntOrNull(starting)
-    const e = parseIntOrNull(ending)
-    if (s != null && e != null && e >= s) {
-      setTotal(String(e - s + 1))
-    } else {
-      setTotal('')
-    }
-  }, [starting, ending])
+  const recomputeRowDerived = (rows) =>
+    rows.map((r, idx) => {
+      const s = computeStartingForRow(rows, idx)
+      const e = parseIntOrNull(r.ending)
+      const t = s != null && e != null && e >= s ? String(e - s + 1) : ''
+      return { ...r, starting: s, total: t }
+    })
+
+  const addTrollyRow = () => {
+    setTrollyRows((prev) => {
+      const next = [...prev, { bookNumber: '', starting: null, ending: '', total: '' }]
+      return recomputeRowDerived(next)
+    })
+  }
+
+  const removeTrollyRow = (index) => {
+    setTrollyRows((prev) => {
+      const next = prev.filter((_, i) => i !== index)
+      return recomputeRowDerived(next)
+    })
+  }
+
+  const updateTrollyRow = (index, field, value) => {
+    setTrollyRows((prev) => {
+      const next = prev.map((r, i) => (i === index ? { ...r, [field]: value } : r))
+      return recomputeRowDerived(next)
+    })
+  }
 
   /* ==================================================================
    * Auto-calc kulAkhrajat from akhrajat amounts
@@ -381,22 +407,58 @@ export default function CreateTransactionForm() {
         return
       }
 
-      if (!selectedBookNumber) {
-        setFormError('براہ کرم کتاب نمبر منتخب کریں۔')
-        toast.error('براہ کرم کتاب نمبر منتخب کریں۔')
+      if (!trollyRows.length) {
+        setFormError('کم از کم ایک کتاب/ٹرالی شامل کریں۔')
+        toast.error('کم از کم ایک کتاب/ٹرالی شامل کریں۔')
         return
       }
 
-      if (!total || parseInt(total) <= 0) {
-        setFormError('کل ٹرالیوں کی تعداد درست نہیں ہے۔')
-        toast.error('کل ٹرالیوں کی تعداد درست نہیں ہے۔')
-        return
-      }
-
-      if (!ending) {
-        setFormError('اختتامی نمبر درج کریں۔')
-        toast.error('اختتامی نمبر درج کریں۔')
-        return
+      // Validate each row
+      for (let i = 0; i < trollyRows.length; i++) {
+        const r = trollyRows[i]
+        if (!r.bookNumber) {
+          setFormError('براہ کرم کتاب نمبر منتخب کریں۔')
+          toast.error('براہ کرم کتاب نمبر منتخب کریں۔')
+          return
+        }
+        if (!r.ending) {
+          setFormError('اختتامی نمبر درج کریں۔')
+          toast.error('اختتامی نمبر درج کریں۔')
+          return
+        }
+        const s = parseIntOrNull(r.starting)
+        const e = parseIntOrNull(r.ending)
+        const t = parseIntOrNull(r.total)
+        if (s == null || e == null || e < s || t == null || t <= 0) {
+          setFormError('ٹرالی کی مقدار/نمبر درست نہیں۔')
+          toast.error('ٹرالی کی مقدار/نمبر درست نہیں۔')
+          return
+        }
+        const bn = parseInt(r.bookNumber, 10)
+        const found = booksForKhda.find((b) => b.bookNumber === bn)
+        const baseUsed = found ? Number(found.usedTickets || 0) : 0
+        const additionalInForm = trollyRows
+          .slice(0, i)
+          .filter((x) => parseInt(x.bookNumber, 10) === bn)
+          .reduce((sum, x) => sum + (parseInt(x.total, 10) || 0), 0)
+        const maxCap = 100
+        if (baseUsed + additionalInForm + t > maxCap) {
+          setFormError(
+            `کتاب نمبر ${bn} میں ${maxCap - (baseUsed + additionalInForm)} ٹکٹ باقی ہیں۔`
+          )
+          toast.error(`کتاب نمبر ${bn} میں ${maxCap - (baseUsed + additionalInForm)} ٹکٹ باقی ہیں۔`)
+          return
+        }
+        const maxTicketInBook = bn * 100
+        if (e > maxTicketInBook) {
+          setFormError(
+            `کتاب نمبر ${bn} کے لیے اختتامی نمبر ${maxTicketInBook} سے زیادہ نہیں ہو سکتا۔`
+          )
+          toast.error(
+            `کتاب نمبر ${bn} کے لیے اختتامی نمبر ${maxTicketInBook} سے زیادہ نہیں ہو سکتا۔`
+          )
+          return
+        }
       }
 
       // Validate akhrajat amounts
@@ -467,9 +529,11 @@ export default function CreateTransactionForm() {
         userID: user.id,
         ZoneName: zoneName,
         KhdaName: khda,
-        bookNumber: Number(selectedBookNumber),
-        totalTickets: Number(total),
-        EndingNum: Number(ending),
+        trollyEntries: trollyRows.map((r) => ({
+          bookNumber: Number(r.bookNumber),
+          totalTickets: Number(r.total),
+          EndingNum: Number(r.ending)
+        })),
         KulAmdan: BigInt(nKulAmdan),
         KulAkhrajat: BigInt(nKulAkhrajat),
         SaafiAmdan: BigInt(nSaafiAmdan),
@@ -552,56 +616,61 @@ export default function CreateTransactionForm() {
             ))}
           </select>
 
-          <label>کتاب نمبر:</label>
-          <select
-            value={selectedBookNumber}
-            onChange={(e) => setSelectedBookNumber(e.target.value)}
-            disabled={!khda}
-          >
-            <option value="">-- منتخب کریں --</option>
-            {booksForKhda.map((b) => (
-              <option key={b.bookNumber} value={b.bookNumber}>
-                {b.bookNumber} (استعمال شدہ: {b.usedTickets}/100)
-              </option>
+          <div className="trolly-rows">
+            <div className="trolly-rows-header">
+              <label>کتاب نمبر / ٹرالی</label>
+            </div>
+            {trollyRows.map((row, idx) => (
+              <div key={idx} className="trolly-row">
+                <select
+                  value={row.bookNumber}
+                  onChange={(e) => updateTrollyRow(idx, 'bookNumber', e.target.value)}
+                  disabled={!khda}
+                >
+                  <option value="">-- کتاب منتخب کریں --</option>
+                  {booksForKhda.map((b) => (
+                    <option key={b.bookNumber} value={b.bookNumber}>
+                      {b.bookNumber} (استعمال شدہ: {b.usedTickets}/100)
+                    </option>
+                  ))}
+                </select>
+                <input
+                  className="form-input"
+                  placeholder="ابتدائی نمبر"
+                  value={row.starting ?? ''}
+                  onChange={(e) => updateTrollyRow(idx, 'starting', e.target.value)}
+                  type="number"
+                  dir="ltr"
+                  onWheel={(e) => e.target.blur()}
+                  readOnly
+                />
+                <input
+                  className="form-input"
+                  placeholder="اختتامی نمبر"
+                  value={row.ending ?? ''}
+                  onChange={(e) => updateTrollyRow(idx, 'ending', e.target.value)}
+                  type="number"
+                  dir="ltr"
+                  onWheel={(e) => e.target.blur()}
+                />
+                <input
+                  className="form-input"
+                  placeholder="کل ٹرالیاں"
+                  value={row.total ?? ''}
+                  readOnly
+                  type="number"
+                  dir="ltr"
+                  onWheel={(e) => e.target.blur()}
+                />
+                <button type="button" className="remove-btn" onClick={() => removeTrollyRow(idx)}>
+                  ❌
+                </button>
+              </div>
             ))}
-          </select>
-
-          <label htmlFor="starting">ابتدائی نمبر:</label>
-          <input
-            id="starting"
-            className="form-input"
-            placeholder="ابتدائی نمبر"
-            value={starting ?? ''}
-            onChange={(e) => setStarting(e.target.value)}
-            type="number"
-            dir="ltr"
-            onWheel={(e) => e.target.blur()}
-            readOnly
-          />
-
-          <label htmlFor="ending">اختتامی نمبر:</label>
-          <input
-            id="ending"
-            className="form-input"
-            placeholder="اختتامی نمبر"
-            value={ending ?? ''}
-            onChange={(e) => setEnding(e.target.value)}
-            type="number"
-            dir="ltr"
-            onWheel={(e) => e.target.blur()}
-          />
-
-          <label htmlFor="total">کل ٹرالیاں:</label>
-          <input
-            id="total"
-            className="form-input"
-            placeholder="کل ٹرالیاں"
-            value={total ?? ''}
-            readOnly
-            type="number"
-            dir="ltr"
-            onWheel={(e) => e.target.blur()}
-          />
+            <button type="button" className="add-btn" onClick={addTrollyRow} disabled={!khda}>
+              ➕ مزید کتاب/ٹرالی شامل کریں
+            </button>
+          </div>
         </div>
 
         <hr className="section-divider" />

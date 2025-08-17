@@ -38,50 +38,79 @@ const transactionHandlers = (ipcMain) => {
         KulMaizan,
         SaafiAmdan,
         Exercise,
-        EndingNum,
-        bookNumber,
-        totalTickets,
+        // New: allow multiple book/trolley entries
+        trollyEntries = [],
         akhrajat = []
       } = data ?? {}
 
       if (!isUrdu(ZoneName) || !isUrdu(KhdaName)) {
         throw new Error('زون اور کھدہ کا نام صرف اردو میں ہونا چاہیے۔')
       }
-      if (!EndingNum) throw new Error('اختتامی نمبر درج کریں۔')
-      if (!bookNumber) throw new Error('کتاب نمبر درج کریں۔')
-      if (!totalTickets || Number(totalTickets) <= 0) {
-        throw new Error('کل ٹکٹ کی تعداد درست نہیں۔')
+      if (!Array.isArray(trollyEntries) || trollyEntries.length === 0) {
+        throw new Error('کم از کم ایک کتاب/ٹرالی درکار ہے۔')
       }
 
-      const activeBook = await prisma.activeBook.findFirst({
-        where: {
-          zoneName: ZoneName,
-          khdaName: KhdaName,
-          bookNumber,
-          isActive: true
+      // Group entries by bookNumber to validate capacity and compute starts per entry
+      const groups = new Map()
+      for (const entry of trollyEntries) {
+        const bn = Number(entry.bookNumber)
+        const total = Number(entry.totalTickets)
+        const end = BigInt(entry.EndingNum)
+        if (!bn) throw new Error('کتاب نمبر درکار ہے')
+        if (!total || total <= 0) throw new Error('کل ٹکٹس درست نہیں')
+        if (!entry.EndingNum) throw new Error('اختتامی نمبر درکار ہے')
+        if (!groups.has(bn)) groups.set(bn, [])
+        groups.get(bn).push({ total, end, raw: entry })
+      }
+
+      // Fetch active books for all involved book numbers
+      const activeBooks = new Map()
+      for (const bn of groups.keys()) {
+        const ab = await prisma.activeBook.findFirst({
+          where: {
+            zoneName: ZoneName,
+            khdaName: KhdaName,
+            bookNumber: bn,
+            isActive: true
+          }
+        })
+        if (!ab) throw new Error(`کتاب نمبر ${bn} اس زون اور کھدہ کے لیے فعال نہیں ہے۔`)
+        activeBooks.set(bn, ab)
+      }
+
+      // Build trollies create payload, validating per entry
+      const trolliesCreateData = []
+      const usageDelta = new Map() // bn -> additional tickets in this request
+      for (const [bn, list] of groups.entries()) {
+        const ab = activeBooks.get(bn)
+        const used = Number(ab.usedTickets || 0)
+        const maxTickets = Number(ab.maxTickets || 100)
+        let priorInRequest = 0
+        for (const { total, end } of list) {
+          const startTicket = (bn - 1) * 100 + used + priorInRequest + 1
+          const maxTicketInBook = BigInt(bn) * 100n
+          if (end <= BigInt(startTicket)) {
+            throw new Error('اختتامی نمبر، ابتدائی نمبر سے بڑا ہونا چاہیے۔')
+          }
+          if (end > maxTicketInBook) {
+            throw new Error(`اختتامی نمبر کتاب کی حد ${maxTicketInBook} سے زیادہ نہیں ہو سکتا۔`)
+          }
+          if (used + priorInRequest + total > maxTickets) {
+            const remain = maxTickets - (used + priorInRequest)
+            const msg = `کتاب نمبر ${bn} میں صرف ${remain} ٹکٹ باقی ہیں۔`
+            throw new Error(msg)
+          }
+
+          trolliesCreateData.push({
+            total: Number(total),
+            StartingNum: BigInt(startTicket),
+            EndingNum: end,
+            bookNumber: bn,
+            activeBookId: ab.id
+          })
+          priorInRequest += total
         }
-      })
-
-      if (!activeBook) {
-        throw new Error(`کتاب نمبر ${bookNumber} اس زون اور کھدہ کے لیے فعال نہیں ہے۔`)
-      }
-
-      const used = activeBook.usedTickets
-      const maxTickets = activeBook.maxTickets || 100
-      const startTicket = (bookNumber - 1) * 100 + used + 1
-      const endTicket = BigInt(startTicket) + BigInt(totalTickets) - 1n
-      const maxTicketInBook = BigInt(bookNumber) * 100n
-
-      if (used + Number(totalTickets) > maxTickets) {
-        throw new Error(`کتاب نمبر ${bookNumber} میں صرف ${maxTickets - used} ٹکٹ باقی ہیں۔`)
-      }
-
-      if (BigInt(EndingNum) <= BigInt(startTicket)) {
-        throw new Error('اختتامی نمبر، ابتدائی نمبر سے بڑا ہونا چاہیے۔')
-      }
-
-      if (BigInt(EndingNum) > maxTicketInBook) {
-        throw new Error(`اختتامی نمبر کتاب کی حد ${maxTicketInBook} سے زیادہ نہیں ہو سکتا۔`)
+        usageDelta.set(bn, priorInRequest)
       }
 
       const dbTitles = await prisma.akhrajatTitle.findMany({ select: { name: true, isGari: true } })
@@ -163,6 +192,7 @@ const transactionHandlers = (ipcMain) => {
         akhrajatCreateData.push(base)
       }
 
+      const firstAb = activeBooks.get(Number(trollyEntries[0].bookNumber))
       const transaction = await prisma.transaction.create({
         data: {
           userID,
@@ -174,17 +204,9 @@ const transactionHandlers = (ipcMain) => {
           SaafiAmdan: BigInt(SaafiAmdan),
           Exercise: BigInt(Exercise),
           date: date ? new Date(date) : new Date(),
-          activeBookId: activeBook.id,
+          activeBookId: firstAb.id,
           trollies: {
-            create: [
-              {
-                total: Number(totalTickets),
-                StartingNum: BigInt(startTicket),
-                EndingNum: endTicket,
-                bookNumber: bookNumber,
-                activeBookId: activeBook.id
-              }
-            ]
+            create: trolliesCreateData
           },
           akhrajat: {
             create: akhrajatCreateData
@@ -196,15 +218,21 @@ const transactionHandlers = (ipcMain) => {
         }
       })
 
-      await prisma.activeBook.update({
-        where: { id: activeBook.id },
-        data: {
-          usedTickets: used + Number(totalTickets),
-          isActive: used + Number(totalTickets) >= maxTickets ? false : true
-        }
-      })
+      // Update all affected active books with new usage
+      for (const [bn, add] of usageDelta.entries()) {
+        const ab = activeBooks.get(bn)
+        const newUsed = Number(ab.usedTickets || 0) + Number(add)
+        const max = Number(ab.maxTickets || 100)
+        await prisma.activeBook.update({
+          where: { id: ab.id },
+          data: {
+            usedTickets: newUsed,
+            isActive: newUsed >= max ? false : true
+          }
+        })
+      }
 
-      console.log(`✅ معاملہ کامیابی سے بنایا گیا، بک نمبر: ${bookNumber}`)
+      console.log(`✅ معاملہ کامیابی سے بنایا گیا، متعدد کتابیں: ${[...groups.keys()].join(', ')}`)
       return transaction
     } catch (err) {
       console.error(`❌ معاملہ بنانے میں ناکامی: ${err.message}`)
@@ -723,7 +751,7 @@ const transactionHandlers = (ipcMain) => {
       })
       if (!trolly) throw new Error('ٹرالی نہیں ملی')
 
-      const { bookNumber, StartingNum, total, transactionId } = trolly
+      const { bookNumber, StartingNum } = trolly
       const { activeBook } = trolly.transaction
       if (!activeBook) throw new Error('منسلک ایکٹو کتاب نہیں ملی')
 

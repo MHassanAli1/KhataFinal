@@ -1,4 +1,5 @@
-import { useEffect, useState, useRef } from 'react'
+/* eslint-disable */
+import { useEffect, useState, useCallback, Fragment } from 'react'
 import { useNavigate } from 'react-router-dom'
 import './TransactionDashboard.css'
 import TransactionDetails from './TransactionDetails'
@@ -24,7 +25,7 @@ function TransactionDashboard() {
   const [filterStartDate, setFilterStartDate] = useState('')
   const [filterEndDate, setFilterEndDate] = useState('')
   const [filterKhda, setFilterKhda] = useState('')
-  const [khdaList, setKhdaList] = useState([])
+  // removed unused khdaList state
   const [zoneList, setZoneList] = useState([])
   const [filterZoneId, setFilterZoneId] = useState('')
   const [filterKhdaList, setFilterKhdaList] = useState([])
@@ -32,12 +33,12 @@ function TransactionDashboard() {
   const [filterBookNumber, setFilterBookNumber] = useState('')
 
   const navigate = useNavigate()
-  const inputRefs = useRef({})
+  // removed unused inputRefs ref
   const [showKeyboard, setShowKeyboard] = useState(false)
   const [activeInput, setActiveInput] = useState(null)
 
   // Refresh transactions after updates or deletions
-  const refreshTransactions = async () => {
+  const refreshTransactions = useCallback(async () => {
     try {
       const txns = await window.api.transactions.getAll({
         zoneName: filterZone || undefined,
@@ -51,7 +52,7 @@ function TransactionDashboard() {
       console.error('Error fetching transactions:', err)
       toast.error('ریکارڈز لوڈ کرنے میں ناکامی')
     }
-  }
+  }, [filterZone, filterKhda, filterBookNumber, filterStartDate, filterEndDate])
 
   useEffect(() => {
     document.body.classList.toggle('editing-active-body', Object.keys(editRows).length > 0)
@@ -60,7 +61,7 @@ function TransactionDashboard() {
 
   useEffect(() => {
     refreshTransactions()
-  }, [filterZone, filterKhda, filterBookNumber, filterStartDate, filterEndDate])
+  }, [refreshTransactions])
 
   useEffect(() => {
     if (filterZoneId) {
@@ -100,9 +101,9 @@ function TransactionDashboard() {
   }, [])
 
   const handleKeyPress = (char) => {
-    if (!activeInput || !activeInput.startsWith('edit-')) return
-    const [_, txnId, field] = activeInput.split('-')
-    setEditRows((prev) => {
+  if (!activeInput || !activeInput.startsWith('edit-')) return
+  const [, txnId, field] = activeInput.split('-')
+  setEditRows((prev) => {
       const currentValue = prev[txnId][field] || ''
       return {
         ...prev,
@@ -127,6 +128,25 @@ function TransactionDashboard() {
   const toggleExpand = (id) => {
     setExpandedId((prev) => (prev === id ? null : id))
   }
+
+  // When TransactionDetails changes akhrajat (or anything) and backend
+  // recalculates totals, merge the fresh record into our table rows.
+  const handleDetailsUpdated = useCallback((updatedTx) => {
+    if (!updatedTx?.id) return
+    setTransactions((prev) => prev.map((t) => (t.id === updatedTx.id ? updatedTx : t)))
+    setEditRows((prev) => {
+      if (!prev[updatedTx.id]) return prev
+      return {
+        ...prev,
+        [updatedTx.id]: {
+          ...prev[updatedTx.id],
+          KulAkhrajat: updatedTx.KulAkhrajat,
+          SaafiAmdan: updatedTx.SaafiAmdan,
+          KulMaizan: updatedTx.KulMaizan
+        }
+      }
+    })
+  }, [])
 
   const handleNavigation = (route) => {
     navigate(route)
@@ -170,10 +190,11 @@ function TransactionDashboard() {
         matchesDate = false
       }
     }
-    const matchesBookNumber =
-      !filterBookNumber ||
-      (txn.trollies[0]?.bookNumber &&
-        txn.trollies[0].bookNumber.toString().includes(filterBookNumber.trim()))
+    const matchesBookNumber = (() => {
+      if (!filterBookNumber) return true
+      const ts = txn.trollies || []
+      return ts.some((t) => t.bookNumber?.toString().includes(filterBookNumber.trim()))
+    })()
     return matchesZone && matchesKhda && matchesDate && matchesBookNumber
   })
 
@@ -218,7 +239,7 @@ function TransactionDashboard() {
     <div className="transaction-dashboard">
       <div className="navigation-header">
         <button
-          className="nav-button form-button"
+          className="nav-button form-button highlight"
           onClick={() => handleNavigation('/CreateTransactionForm')}
         >
           📝 فارم
@@ -304,10 +325,6 @@ function TransactionDashboard() {
               <th>تاریخ</th>
               <th>زون</th>
               <th>کھدہ</th>
-              <th>کتاب نمبر</th>
-              <th>ابتدائی نمبر</th>
-              <th>اختتامی نمبر</th>
-              <th>کل ٹرالیاں</th>
               <th>کل آمدن</th>
               <th>کل اخراجات</th>
               <th>صافی آمدن</th>
@@ -321,8 +338,29 @@ function TransactionDashboard() {
               const isEditing = editRows[txn.id]
               const edited = editRows[txn.id] || {}
 
+              // helper to compute and set derived numbers during editing
+              const setWithDerived = (field, value) => {
+                setEditRows((prev) => {
+                  const cur = prev[txn.id] || {}
+                  const draft = { ...cur, [field]: value }
+                  const n = (v) => (v === '' || v == null ? 0 : Number(v))
+                  const baseKulAkh = n(draft.KulAkhrajat ?? txn.KulAkhrajat)
+                  const baseKulAmd = n(draft.KulAmdan ?? txn.KulAmdan)
+                  const baseEx = n(draft.Exercise ?? txn.Exercise)
+                  // If SaafiAmdan is being directly edited, respect it; otherwise derive
+                  const saafi =
+                    field === 'SaafiAmdan' ? n(value) : Math.max(0, baseKulAmd - baseKulAkh)
+                  const kulMaizan = saafi + (field === 'Exercise' ? n(value) : baseEx)
+                  return {
+                    ...prev,
+                    [txn.id]: { ...draft, SaafiAmdan: saafi, KulMaizan: kulMaizan }
+                  }
+                })
+              }
+
               return (
-                <tr key={txn.id} className={isEditing ? 'editing-row' : ''}>
+                <Fragment key={txn.id}>
+                  <tr className={isEditing ? 'editing-row' : ''}>
                   <td>
                     {isEditing ? (
                       <input
@@ -399,10 +437,6 @@ function TransactionDashboard() {
                       normalizeUrdu(txn.KhdaName) || '—'
                     )}
                   </td>
-                  <td>{txn.trollies[0]?.bookNumber ?? '—'}</td>
-                  <td>{txn.trollies[0]?.StartingNum.toString() ?? '—'}</td>
-                  <td>{txn.trollies[0]?.EndingNum.toString() ?? '—'}</td>
-                  <td>{txn.trollies[0]?.total ?? '—'}</td>
                   <td>
                     {isEditing ? (
                       <input
@@ -410,13 +444,8 @@ function TransactionDashboard() {
                         className="edit-input"
                         dir="ltr"
                         onWheel={(e) => e.target.blur()}
-                        value={edited.KulAmdan || txn.KulAmdan || ''}
-                        onChange={(e) =>
-                          setEditRows((prev) => ({
-                            ...prev,
-                            [txn.id]: { ...edited, KulAmdan: e.target.value }
-                          }))
-                        }
+                        value={edited.KulAmdan ?? txn.KulAmdan ?? ''}
+                        onChange={(e) => setWithDerived('KulAmdan', e.target.value)}
                       />
                     ) : (
                       txn.KulAmdan.toString()
@@ -430,7 +459,7 @@ function TransactionDashboard() {
                         dir="ltr"
                         onWheel={(e) => e.target.blur()}
                         readOnly
-                        value={edited.KulAkhrajat || txn.KulAkhrajat || ''}
+                        value={edited.KulAkhrajat ?? txn.KulAkhrajat ?? ''}
                         onChange={(e) =>
                           setEditRows((prev) => ({
                             ...prev,
@@ -449,13 +478,8 @@ function TransactionDashboard() {
                         className="edit-input"
                         dir="ltr"
                         onWheel={(e) => e.target.blur()}
-                        value={edited.SaafiAmdan || txn.SaafiAmdan || ''}
-                        onChange={(e) =>
-                          setEditRows((prev) => ({
-                            ...prev,
-                            [txn.id]: { ...edited, SaafiAmdan: e.target.value }
-                          }))
-                        }
+                        value={edited.SaafiAmdan ?? txn.SaafiAmdan ?? ''}
+                        onChange={(e) => setWithDerived('SaafiAmdan', e.target.value)}
                       />
                     ) : (
                       txn.SaafiAmdan.toString()
@@ -468,13 +492,8 @@ function TransactionDashboard() {
                         className="edit-input"
                         dir="ltr"
                         onWheel={(e) => e.target.blur()}
-                        value={edited.Exercise || txn.Exercise || 0}
-                        onChange={(e) =>
-                          setEditRows((prev) => ({
-                            ...prev,
-                            [txn.id]: { ...edited, Exercise: e.target.value }
-                          }))
-                        }
+                        value={edited.Exercise ?? txn.Exercise ?? 0}
+                        onChange={(e) => setWithDerived('Exercise', e.target.value)}
                       />
                     ) : (
                       txn.Exercise?.toString() || '0'
@@ -487,7 +506,7 @@ function TransactionDashboard() {
                         className="edit-input"
                         dir="ltr"
                         onWheel={(e) => e.target.blur()}
-                        value={edited.KulMaizan || txn.KulMaizan || 0}
+                        value={edited.KulMaizan ?? txn.KulMaizan ?? 0}
                         onChange={(e) =>
                           setEditRows((prev) => ({
                             ...prev,
@@ -535,7 +554,7 @@ function TransactionDashboard() {
                           <button
                             className="delete-button"
                             onClick={async () => {
-                              const trolly = txn.trollies[0]
+                              const trolly = (txn.trollies || [])[0]
                               if (!trolly) {
                                 toast.error('ٹرالی کی معلومات غائب ہیں')
                                 return
@@ -545,17 +564,24 @@ function TransactionDashboard() {
                               const khda = normalizeUrdu(txn.KhdaName)
                               const startNum = Number(trolly.StartingNum)
 
-                              const allInBook = transactions.filter(
-                                (t) => t.trollies[0]?.bookNumber === bookNum
+                              const allInBook = transactions.filter((t) =>
+                                (t.trollies || []).some((tr) => tr.bookNumber === bookNum)
                               )
                               const totalInBook = allInBook.reduce(
-                                (sum, t) => sum + (t.trollies[0]?.total || 0),
+                                (sum, t) =>
+                                  sum +
+                                  (t.trollies || []).reduce((s, tr) => s + (tr.total || 0), 0),
                                 0
                               )
 
-                              const forward = allInBook.filter(
-                                (t) => Number(t.trollies[0]?.StartingNum) >= startNum
-                              )
+                              const forward = allInBook.filter((t) => {
+                                const minStart = (t.trollies || []).reduce((min, tr) => {
+                                  const n = Number(tr.StartingNum)
+                                  if (min === null || n < min) return n
+                                  return min
+                                }, null)
+                                return (minStart ?? 0) >= startNum
+                              })
                               const forwardCount = forward.length
 
                               const isFullOrInactive =
@@ -595,19 +621,25 @@ function TransactionDashboard() {
                       )}
                     </div>
                   </td>
-                </tr>
+                  </tr>
+                  {expandedId === txn.id && (
+                    <tr className="details-row">
+                      <td colSpan={9}>
+                        <TransactionDetails
+                          transaction={transactions.find((t) => t.id === txn.id) || txn}
+                          onUpdate={handleDetailsUpdated}
+                          onClose={() => setExpandedId(null)}
+                        />
+                      </td>
+                    </tr>
+                  )}
+                </Fragment>
               )
             })}
           </tbody>
         </table>
       </div>
 
-      {expandedId && (
-        <TransactionDetails
-          transaction={transactions.find((t) => t.id === expandedId)}
-          onClose={() => setExpandedId(null)}
-        />
-      )}
 
       <hr />
       <div className="zone-summary">
@@ -732,7 +764,7 @@ function TransactionDashboard() {
           <h4 className="section-title">📊 رپورٹس اور خلاصہ</h4>
           <div className="bottom-nav-buttons">
             <button
-              className="bottom-nav-btn primary"
+              className="bottom-nav-btn primary emphasis"
               onClick={() => handleNavigation('./AkhrajatSummary')}
             >
               <span className="btn-icon">💰</span>
@@ -760,14 +792,14 @@ function TransactionDashboard() {
               <span className="btn-text">ریکارڈ کا خلاصہ</span>
             </button>
             <button
-              className="bottom-nav-btn primary"
+              className="bottom-nav-btn primary emphasis"
               onClick={() => handleNavigation('./GariSummary')}
             >
               <span className="btn-icon">🚗</span>
               <span className="btn-text">گاڑی کا خلاصہ</span>
             </button>
             <button
-              className="bottom-nav-btn primary"
+              className="bottom-nav-btn primary emphasis"
               onClick={() => handleNavigation('./MutafarikAkhrajatSummary')}
             >
               <span className="btn-icon">⛩️</span>
@@ -780,7 +812,7 @@ function TransactionDashboard() {
           <h4 className="section-title">⚙️ منیجمنٹ</h4>
           <div className="bottom-nav-buttons">
             <button
-              className="bottom-nav-btn secondary"
+              className="bottom-nav-btn secondary emphasis"
               onClick={() => handleNavigation('./AdminPanel')}
             >
               <span className="btn-icon">👨‍💼</span>
