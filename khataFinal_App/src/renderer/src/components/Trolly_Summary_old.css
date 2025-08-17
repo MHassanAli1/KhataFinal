@@ -30,10 +30,16 @@
 .filters input,
 .filters select {
   margin-top: 0.5rem;
-  padding: 0.5rem;
-  border: 1px solid #cbd5e0;
-  border-radius: 0.375rem;
-  font-size: 1rem; /* Increased input font size */
+  padding: 0.75rem 1rem;
+  border: 2px solid #e5e7eb;
+  border-radius: 0.5rem;
+  font-size: 1.2rem; /* Increased input font size */
+}
+
+/* Ensure select options are also larger */
+.filters select option {
+  font-size: 1.2rem;
+  padding: 12px 16px;
 }
 
 .table-container {

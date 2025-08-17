@@ -247,9 +247,13 @@ const transactionHandlers = (ipcMain) => {
     try {
       const { zoneName, khdaName, bookNumber, dateFrom, dateTo } = filters
 
+      // Use exact equality for Urdu strings to avoid collation issues in SQLite
+      const zName = typeof zoneName === 'string' ? zoneName.trim() : undefined
+      const kName = typeof khdaName === 'string' ? khdaName.trim() : undefined
+
       const where = {
-        ...(zoneName ? { ZoneName: { contains: zoneName, mode: 'insensitive' } } : {}),
-        ...(khdaName ? { KhdaName: { contains: khdaName, mode: 'insensitive' } } : {}),
+        ...(zName ? { ZoneName: { equals: zName } } : {}),
+        ...(kName ? { KhdaName: { equals: kName } } : {}),
         ...(bookNumber
           ? {
               trollies: {

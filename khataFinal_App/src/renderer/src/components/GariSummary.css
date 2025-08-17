@@ -91,6 +91,13 @@
   color: #1e293b;
 }
 
+/* Ensure select options are also larger */
+.filter-input option,
+select.filter-input option {
+  font-size: 1.1rem;
+  padding: 12px 16px;
+}
+
 .filter-input:focus {
   outline: none;
   border-color: #3b82f6;

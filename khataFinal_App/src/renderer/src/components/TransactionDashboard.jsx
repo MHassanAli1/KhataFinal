@@ -162,40 +162,12 @@ function TransactionDashboard() {
       : ''
   }
 
+  // Rely on backend for Zone/Khdah/Date filters. Only apply optional
+  // client-side partial search on Book Number for convenience.
   const filteredTransactions = transactions.filter((txn) => {
-    const matchesZone =
-      !filterZone || normalizeUrdu(txn.ZoneName || '').includes(normalizeUrdu(filterZone))
-    const matchesKhda =
-      !filterKhda || normalizeUrdu(txn.KhdaName || '').includes(normalizeUrdu(filterKhda))
-    let matchesDate = true
-    if (filterStartDate || filterEndDate) {
-      const txnDate = txn.date ? new Date(txn.date) : null
-      if (txnDate) {
-        const txnDateOnly = new Date(txnDate.getFullYear(), txnDate.getMonth(), txnDate.getDate())
-        if (filterStartDate) {
-          const startDate = new Date(filterStartDate)
-          const startDateOnly = new Date(
-            startDate.getFullYear(),
-            startDate.getMonth(),
-            startDate.getDate()
-          )
-          if (txnDateOnly < startDateOnly) matchesDate = false
-        }
-        if (filterEndDate && matchesDate) {
-          const endDate = new Date(filterEndDate)
-          const endDateOnly = new Date(endDate.getFullYear(), endDate.getMonth(), endDate.getDate())
-          if (txnDateOnly > endDateOnly) matchesDate = false
-        }
-      } else {
-        matchesDate = false
-      }
-    }
-    const matchesBookNumber = (() => {
-      if (!filterBookNumber) return true
-      const ts = txn.trollies || []
-      return ts.some((t) => t.bookNumber?.toString().includes(filterBookNumber.trim()))
-    })()
-    return matchesZone && matchesKhda && matchesDate && matchesBookNumber
+    if (!filterBookNumber) return true
+    const ts = txn.trollies || []
+    return ts.some((t) => t.bookNumber?.toString().includes(filterBookNumber.trim()))
   })
 
   const totalByZone = filteredTransactions.reduce((acc, t) => {

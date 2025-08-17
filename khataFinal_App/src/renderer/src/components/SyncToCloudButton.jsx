@@ -1,3 +1,4 @@
+/* eslint-disable prettier/prettier */
 'use client'
 
 import { useState } from 'react'
@@ -13,176 +14,101 @@ const SyncToCloudButton = () => {
     setMessage('')
 
     try {
-      // STEP 1: get local transactions
-      const localTransactions = await window.api.transactions.getAll()
+      // Build full backup and upload once
+      const [
+        zones,
+        othersTitles,
+        akhrajatTitles,
+        gariTitles,
+        gariExpenseTypeTitles,
+        gariParts,
+        transactions
+      ] = await Promise.all([
+        window.api.admin.zones.getAll(),
+        window.api.admin.othersTitles.getAll(),
+        window.api.admin.akhrajatTitles.getAll(),
+        window.api.admin.gariTitles.getAll(),
+        window.api.admin.gariExpenseTypes.getAll(),
+        window.api.admin.gariParts.getAll(),
+        window.api.transactions.getAll({})
+      ])
 
-      // STEP 2: update changed transactions
-      for (const tx of localTransactions) {
-        if (tx.Synced && tx.SyncedAt && new Date(tx.updatedAt) > new Date(tx.SyncedAt)) {
-          try {
-            const response = await fetch(`${URL_CLOUD}/transactions/${tx.id}`, {
-              method: 'PUT',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                ZoneName: tx.ZoneName,
-                KhdaName: tx.KhdaName,
-                KulAmdan: tx.KulAmdan.toString(),
-                bookNumber: tx.bookNumber,
-                date: tx.date,
-                KulAkhrajat: tx.KulAkhrajat.toString(),
-                SaafiAmdan: tx.SaafiAmdan.toString(),
-                Exercise: tx.Exercise.toString(),
-                KulMaizan: tx.KulMaizan.toString(),
-                trollies: tx.trollies.map((t) => ({
-                  total: t.total,
-                  StartingNum: t.StartingNum.toString(),
-                  EndingNum: t.EndingNum.toString()
-                })),
-                akhrajat: tx.akhrajat.map((a) => ({
-                  title: a.title,
-                  description: a.description,
-                  amount: a.amount.toString(),
-                  date: a.date
-                }))
-              })
-            })
-
-            if (response.status === 404) {
-              // server does not know about this id
-              console.warn(`⚠️ Transaction ${tx.id} not found on server, retrying as POST`)
-              throw new Error('Not found')
+      const normalizedTransactions = (transactions || []).map((tx) => ({
+        id: tx.id,
+        ZoneName: tx.ZoneName,
+        KhdaName: tx.KhdaName,
+        date: tx.date,
+        KulAmdan: tx.KulAmdan != null ? tx.KulAmdan.toString() : '0',
+        KulAkhrajat: tx.KulAkhrajat != null ? tx.KulAkhrajat.toString() : '0',
+        SaafiAmdan: tx.SaafiAmdan != null ? tx.SaafiAmdan.toString() : '0',
+        Exercise: tx.Exercise != null ? tx.Exercise.toString() : '0',
+        KulMaizan: tx.KulMaizan != null ? tx.KulMaizan.toString() : '0',
+        createdAt: tx.createdAt,
+        updatedAt: tx.updatedAt,
+        activeBook: tx.activeBook
+          ? {
+              id: tx.activeBook.id,
+              bookNumber: tx.activeBook.bookNumber,
+              zoneName: tx.activeBook.zoneName,
+              khdaName: tx.activeBook.khdaName,
+              isActive: tx.activeBook.isActive,
+              usedTickets: tx.activeBook.usedTickets,
+              maxTickets: tx.activeBook.maxTickets,
+              createdAt: tx.activeBook.createdAt,
+              updatedAt: tx.activeBook.updatedAt
             }
+          : null,
+        trollies: (tx.trollies || []).map((t) => ({
+          id: t.id,
+          total: t.total,
+          bookNumber: t.bookNumber,
+          StartingNum: t.StartingNum != null ? t.StartingNum.toString() : '0',
+          EndingNum: t.EndingNum != null ? t.EndingNum.toString() : '0'
+        })),
+        akhrajat: (tx.akhrajat || []).map((a) => ({
+          id: a.id,
+          title: a.title,
+          description: a.description ?? null,
+          amount: a.amount != null ? a.amount.toString() : '0',
+          date: a.date,
+          isGari: a.isGari ?? false,
+          isOther: a.isOther ?? false,
+          othersTitlesId: a.othersTitlesId ?? null,
+          gariExpense: (a.gariExpense || []).map((g) => ({
+            Id: g.Id,
+            title: g.title,
+            quantity: g.quantity ?? null,
+            part: g.part ?? null
+          }))
+        }))
+      }))
 
-            if (!response.ok) throw new Error('Update failed')
-
-            await window.api.transactions.markSynced({
-              id: tx.id,
-              syncedAt: new Date().toISOString()
-            })
-
-            console.log(`✅ Synced update: Transaction ${tx.id}`)
-          } catch (err) {
-            console.error(`❌ Failed to sync update for tx ${tx.id}, will retry as POST`, err)
-
-            // fallback to POST
-            try {
-              const createResponse = await fetch(`${URL_CLOUD}/transactions`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                  id: tx.id, // 👈 add this
-                  ZoneName: tx.ZoneName,
-                  KhdaName: tx.KhdaName,
-                  KulAmdan: tx.KulAmdan.toString(),
-                  bookNumber: tx.bookNumber,
-                  ticketNumber: tx.ticketNumber,
-                  date: tx.date,
-                  KulAkhrajat: tx.KulAkhrajat.toString(),
-                  SaafiAmdan: tx.SaafiAmdan.toString(),
-                  Exercise: tx.Exercise.toString(),
-                  KulMaizan: tx.KulMaizan.toString(),
-                  trollies: tx.trollies.map((t) => ({
-                    id: t.id, // 👈 add this too if you want to sync trolly id
-                    total: t.total,
-                    StartingNum: t.StartingNum.toString(),
-                    EndingNum: t.EndingNum.toString()
-                  })),
-                  akhrajat: tx.akhrajat.map((a) => ({
-                    id: a.id, // 👈 add this too if you want to sync akhrajat id
-                    title: a.title,
-                    description: a.description,
-                    amount: a.amount.toString(),
-                    date: a.date
-                  }))
-                })
-              })
-
-              if (!createResponse.ok) throw new Error('POST fallback failed')
-
-              await window.api.transactions.markSynced({
-                id: tx.id,
-                syncedAt: new Date().toISOString()
-              })
-
-              console.log(`✅ Synced create fallback for tx ${tx.id}`)
-            } catch (postErr) {
-              console.error(`❌ Failed to sync fallback POST for tx ${tx.id}`, postErr)
-            }
-          }
-        }
+      const payload = {
+        version: '1.0',
+        generatedAt: new Date().toISOString(),
+        masters: {
+          zones: zones || [],
+          othersTitles: othersTitles || [],
+          akhrajatTitles: akhrajatTitles || [],
+          gariTitles: gariTitles || [],
+          gariExpenseTypeTitles: gariExpenseTypeTitles || [],
+          gariParts: gariParts || []
+        },
+        data: { transactions: normalizedTransactions }
       }
 
-      // STEP 3: post new transactions
-      for (const tx of localTransactions) {
-        if (!tx.Synced) {
-          try {
-            const response = await fetch(`${URL_CLOUD}/transactions`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                id: tx.id, // 👈 add this
-                ZoneName: tx.ZoneName,
-                KhdaName: tx.KhdaName,
-                KulAmdan: tx.KulAmdan.toString(),
-                bookNumber: tx.bookNumber,
-                ticketNumber: tx.ticketNumber,
-                date: tx.date,
-                KulAkhrajat: tx.KulAkhrajat.toString(),
-                SaafiAmdan: tx.SaafiAmdan.toString(),
-                Exercise: tx.Exercise.toString(),
-                KulMaizan: tx.KulMaizan.toString(),
-                trollies: tx.trollies.map((t) => ({
-                  id: t.id, // 👈 add this
-                  total: t.total,
-                  StartingNum: t.StartingNum.toString(),
-                  EndingNum: t.EndingNum.toString()
-                })),
-                akhrajat: tx.akhrajat.map((a) => ({
-                  id: a.id, // 👈 add this
-                  title: a.title,
-                  description: a.description,
-                  amount: a.amount.toString(),
-                  date: a.date
-                }))
-              })
-            })
+      const response = await fetch(`${URL_CLOUD}/backup/full`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      })
 
-            if (!response.ok) throw new Error('Post failed')
+      if (!response.ok) throw new Error('Backup upload failed')
 
-            await window.api.transactions.markSynced({
-              id: tx.id,
-              syncedAt: new Date().toISOString()
-            })
-
-            console.log(`✅ Synced create: Transaction ${tx.id}`)
-          } catch (err) {
-            console.error(`❌ Failed to sync create for tx ${tx.id}`, err)
-          }
-        }
-      }
-
-      // STEP 4: deleted transactions
-      const deleted = await window.api.transactions.getDeleted()
-
-      for (const d of deleted) {
-        try {
-          const response = await fetch(`${URL_CLOUD}/transactions/${d.transactionId}`, {
-            method: 'DELETE'
-          })
-          if (!response.ok) throw new Error('Delete failed')
-          console.log(`✅ Synced delete: Transaction ${d.transactionId}`)
-        } catch (err) {
-          console.error(`❌ Failed to delete transaction ${d.transactionId}`, err)
-        }
-      }
-
-      // STEP 5: clear deleted transactions
-      await window.api.transactions.clearDeleted()
-
-      setMessage('✅ Sync completed successfully!')
+      setMessage('✅ Backup completed successfully!')
     } catch (err) {
       console.error('❌ Sync failed', err)
-      setMessage('❌ Sync failed')
+      setMessage('❌ Backup failed')
     } finally {
       setSyncing(false)
     }

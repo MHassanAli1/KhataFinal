@@ -29,11 +29,17 @@
 
 .filters input,
 .filters select {
-  padding: 0.5rem;
-  border: 1px solid #ccc;
-  border-radius: 0.25rem;
-  font-size: 1.1rem; /* Increased input font size */
+  padding: 0.75rem 1rem;
+  border: 2px solid #e5e7eb;
+  border-radius: 0.5rem;
+  font-size: 1.2rem; /* Increased input font size */
   margin-top: 0.25rem;
+}
+
+/* Ensure select options are also larger */
+.filters select option {
+  font-size: 1.2rem;
+  padding: 12px 16px;
 }
 
 .summary-table {
